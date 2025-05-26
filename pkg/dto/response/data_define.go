@@ -22,5 +22,6 @@ func build(resp *RunFunctionResp, data interface{}, renderType string) error {
 	}
 	resp.RenderType = renderType
 	resp.Data = data
+	resp.Msg = "ok"
 	return nil
 }

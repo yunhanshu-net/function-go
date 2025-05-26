@@ -39,7 +39,7 @@ import (
 //)
 
 // OnPageLoad 当用户进入某个函数的页面后，函数默认调用的行为，用户可以通过这个来初始化表单数据，resetRequest可以返回初始化后的表单数据
-type OnPageLoad func(ctx *Context) (resetRequest interface{}, resp interface{}, err error)
+type OnPageLoad func(ctx *Context, resp response.Response) (initData *usercall.OnPageLoadResp, err error)
 
 // OnApiCreated 创建新的api时候的回调函数,新增一个api假如新增了一张user表， 可以在这里用gorm的db.AutoMigrate(&User)来创建表，
 // 保证新版本的api可以正常使用新增的表 这个api只会在我创建这个api的时候执行一次
@@ -106,19 +106,29 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
 		}
-
-		resetReq, rsp, err := apiConf.OnPageLoad(ctx)
+		userResp := &response.RunFunctionResp{}
+		rsp, err := apiConf.OnPageLoad(ctx, userResp)
 		if err != nil {
 			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnPageLoad failed: %w", err)
 		}
-		res.Request = resetReq
-		res.Response = rsp
+		type OnPageLoadResp struct {
+			Multiple bool        `json:"multiple"` //是否多返回值
+			Request  interface{} `json:"request"`  //会初始化前端的表单参数
+			Response interface{} `json:"response"` //会初始化前端的的响应参数
+			AuthRun  bool        `json:"auth_run"` //是否自动运行
+		}
 
-		// 记录响应参数
-		resetReqJSON, _ := json.Marshal(resetReq)
-		rspJSON, _ := json.Marshal(rsp)
-		logger.InfoContextf(ctx, "回调处理成功 [类型:%s] 重置请求: %s, 响应: %s", req.Type, resetReqJSON, rspJSON)
+		if rsp == nil {
+			return resp.Form(&OnPageLoadResp{}).Build()
+		}
+		rs := &OnPageLoadResp{
+			Multiple: userResp.Multiple,
+			Request:  rsp.Request,
+			Response: userResp.GetData(),
+			AuthRun:  rsp.AuthRun,
+		}
+		return resp.Form(rs).Build()
 
 	// API 生命周期回调
 	case consts.UserCallTypeOnApiCreated:

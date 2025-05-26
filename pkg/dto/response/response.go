@@ -12,6 +12,13 @@ type RunFunctionResp struct {
 	Multiple   bool                   `json:"multiple"`
 }
 
+func (r *RunFunctionResp) GetData() interface{} {
+	if r.Multiple {
+		return r.DataList
+	}
+	return r.Data
+}
+
 type RunFunctionRespWithData[T any] struct {
 	MetaData   map[string]interface{} `json:"meta_data"`
 	Headers    map[string]string      `json:"headers"`

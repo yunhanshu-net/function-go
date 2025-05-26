@@ -1,5 +1,0 @@
-package calc
-
-func Init() {
-
-}

@@ -21,7 +21,8 @@ type ApiInfo struct {
 
 	//用map的都是字段级别的回调，其他的都是接口级别回调
 
-	OnPageLoad OnPageLoad `json:"-"`
+	OnPageLoad OnPageLoad `json:"-"` //优先级最高，先初始化表单参数，然后再判断是否有自动运行的回调，如果有，则执行
+	AutoRun    bool       `json:"-"` //是否自动运行
 
 	OnApiCreated    OnApiCreated    `json:"-"`
 	OnApiUpdated    OnApiUpdated    `json:"-"`
