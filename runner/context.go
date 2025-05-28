@@ -24,3 +24,7 @@ func (c *Context) getTraceId() string {
 func (c *Context) GetUsername() string {
 	return ""
 }
+
+func (c *Context) GetFile() string {
+	return ""
+}

@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/nats-io/nats.go"
 	"github.com/yunhanshu-net/pkg/constants"
 	"github.com/yunhanshu-net/pkg/dto/runnerproject"
 	"github.com/yunhanshu-net/sdk-go/env"
 	"github.com/yunhanshu-net/sdk-go/pkg/dto/request"
 	"github.com/yunhanshu-net/sdk-go/pkg/logger"
-	"time"
 )
 
 // New 创建一个新的Runner实例
@@ -19,6 +20,7 @@ func New() *Runner {
 	if err != nil {
 		panic(err)
 	}
+
 	return &Runner{
 		idle:      5,
 		detail:    runner,
