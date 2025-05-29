@@ -101,7 +101,7 @@ func sanitizeDBName(dbName string) string {
 
 // Context的MustGetOrInitDB方法
 func (c *Context) MustGetOrInitDB(dbName string) *gorm.DB {
-	return MustGetOrInitDB(dbName)
+	return MustGetOrInitDB(c.getDb())
 }
 
 // CloseAllDBs 关闭所有数据库连接，用于程序退出时清理

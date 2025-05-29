@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"github.com/yunhanshu-net/sdk-go/pkg/dto/request"
 	"github.com/yunhanshu-net/sdk-go/pkg/dto/response"
 	"strings"
@@ -29,7 +28,7 @@ func (r *Runner) getRouter(router string, method string) (worker *routerInfo, ex
 	return worker, ok
 }
 
-func (r *routerInfo) call(ctx context.Context, reqBody interface{}) (req *request.RunFunctionReq, resp *response.RunFunctionResp, err error) {
+func (r *routerInfo) call(ctx *Context, reqBody interface{}) (req *request.RunFunctionReq, resp *response.RunFunctionResp, err error) {
 	// 使用读锁访问缓存
 	handlerCacheMux.RLock()
 	meta, ok := handlerCacheMap[r.key]
@@ -59,8 +58,8 @@ func (r *routerInfo) call(ctx context.Context, reqBody interface{}) (req *reques
 	}
 	req = new(request.RunFunctionReq)
 	resp = new(response.RunFunctionResp)
-	ctx1 := &Context{Context: ctx}
-	err = doCall(r.Method, meta.meta, ctx1, resp, reqBody)
+	//ctx1 := &Context{Context: ctx}
+	err = doCall(r.Method, meta.meta, ctx, resp, reqBody)
 	if err != nil {
 		return nil, nil, err
 	}

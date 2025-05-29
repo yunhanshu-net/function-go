@@ -289,58 +289,8 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	// 输入交互回调
 	case consts.CallbackTypeOnInputFuzzy:
-		var reqData usercall.OnInputFuzzyReq
-		if apiConf.OnInputFuzzy == nil {
-			err = fmt.Errorf("OnInputFuzzyReq handler not configured")
-			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
-			return err
-		}
-		if err := req.DecodeData(&reqData); err != nil {
-			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
-			return fmt.Errorf("OnInputFuzzyReq decode failed: %w", err)
-		}
-
-		// 记录请求详情
-		reqDataJSON, _ := json.Marshal(reqData)
-		logger.InfoContextf(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
-
-		respData, err := apiConf.OnInputFuzzy(ctx, &reqData)
-		if err != nil {
-			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
-			return fmt.Errorf("OnInputFuzzyReq failed: %w", err)
-		}
-		res.Response = respData
-
-		// 记录响应参数
-		respDataJSON, _ := json.Marshal(respData)
-		logger.InfoContextf(ctx, "回调处理成功 [类型:%s] 响应: %s", req.Type, respDataJSON)
 
 	case consts.CallbackTypeOnInputValidate:
-		var reqData usercall.OnInputValidateReq
-		if apiConf.OnInputValidate == nil {
-			err = fmt.Errorf("OnInputValidateReq handler not configured")
-			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
-			return err
-		}
-		if err := req.DecodeData(&reqData); err != nil {
-			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
-			return fmt.Errorf("OnInputValidateReq decode failed: %w", err)
-		}
-
-		// 记录请求详情
-		reqDataJSON, _ := json.Marshal(reqData)
-		logger.InfoContextf(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
-
-		respData, err := apiConf.OnInputValidate(ctx, &reqData)
-		if err != nil {
-			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
-			return fmt.Errorf("OnInputValidateReq failed: %w", err)
-		}
-		res.Response = respData
-
-		// 记录响应参数
-		respDataJSON, _ := json.Marshal(respData)
-		logger.InfoContextf(ctx, "回调处理成功 [类型:%s] 响应: %s", req.Type, respDataJSON)
 
 	// 表格操作回调
 	case consts.CallbackTypeOnTableDeleteRows:

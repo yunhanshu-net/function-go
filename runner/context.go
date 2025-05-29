@@ -2,11 +2,19 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"github.com/yunhanshu-net/pkg/constants"
 )
 
 type Context struct {
 	context.Context
+	user    string
+	name    string
+	version string
+}
+
+func (c *Context) getDb() string {
+	return fmt.Sprintf("%s_%s.db", c.user, c.name)
 }
 
 func (c *Context) getTraceId() string {

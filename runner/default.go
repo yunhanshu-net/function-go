@@ -44,15 +44,19 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 
 	// 构建API信息
 	apiInfo := &api.Info{
-		Method:      worker.Method,
-		Router:      worker.Router,
-		User:        r.detail.User,
-		Runner:      r.detail.Name,
-		ApiDesc:     config.ApiDesc,
-		Tags:        config.Tags,
-		Classify:    config.Classify,
-		ChineseName: config.ChineseName,
-		EnglishName: config.EnglishName,
+		Method:       worker.Method,
+		Router:       worker.Router,
+		User:         r.detail.User,
+		Runner:       r.detail.Name,
+		ApiDesc:      config.ApiDesc,
+		Async:        config.Async,
+		Timeout:      config.Timeout,
+		FunctionType: string(config.FunctionType),
+		AutoRun:      config.AutoRun,
+		Tags:         config.Tags,
+		Classify:     config.Classify,
+		ChineseName:  config.ChineseName,
+		EnglishName:  config.EnglishName,
 	}
 
 	if config.Request != nil {
@@ -80,6 +84,18 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 		}
 	}
 	apiInfo.UseDB = config.UseDB
+
+	// 获取数据表信息
+	for _, table := range config.CreateTables { //记录函数创建的表
+		if tb, ok := table.(schema.Tabler); ok {
+			apiInfo.CreateTables = append(apiInfo.UseTables, tb.TableName())
+		}
+	}
+	for table, crud := range config.OperateTables { //记录函数对表的crud操作
+		if tb, ok := table.(schema.Tabler); ok {
+			apiInfo.OperateTables[tb.TableName()] = crud
+		}
+	}
 
 	// 获取回调函数信息
 	apiInfo.Callbacks = getCallbacks(config)
@@ -183,14 +199,6 @@ func getCallbacks(config *ApiInfo) []string {
 	// 版本控制回调
 	if config.OnVersionChange != nil {
 		callbacks = append(callbacks, constants.CallbackTypeOnVersionChange)
-	}
-
-	// 输入交互回调
-	if config.OnInputFuzzy != nil {
-		callbacks = append(callbacks, constants.CallbackTypeOnInputFuzzy)
-	}
-	if config.OnInputValidate != nil {
-		callbacks = append(callbacks, constants.CallbackTypeOnInputValidate)
 	}
 
 	// 表格操作回调
