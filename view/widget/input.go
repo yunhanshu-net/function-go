@@ -2,9 +2,9 @@ package widget
 
 import (
 	"fmt"
+	"github.com/yunhanshu-net/function-go/view/widget/types"
 	"github.com/yunhanshu-net/pkg/x/stringsx"
 	"github.com/yunhanshu-net/pkg/x/tagx"
-	"github.com/yunhanshu-net/sdk-go/view/widget/types"
 )
 
 // InputWidget 输入框组件

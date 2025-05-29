@@ -1,4 +1,4 @@
-module github.com/yunhanshu-net/sdk-go
+module github.com/yunhanshu-net/function-go
 
 go 1.23.4
 

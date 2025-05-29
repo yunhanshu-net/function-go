@@ -1,9 +1,9 @@
 package widget
 
 import (
+	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/pkg/x/stringsx"
 	"github.com/yunhanshu-net/pkg/x/tagx"
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/response"
 )
 
 func NewWidget(info *tagx.RunnerFieldInfo, renderType string) (Widget, error) {

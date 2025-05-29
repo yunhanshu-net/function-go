@@ -1,8 +1,8 @@
 package runner
 
 import (
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/request"
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/response"
+	"github.com/yunhanshu-net/function-go/pkg/dto/request"
+	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"strings"
 )
 
@@ -11,7 +11,7 @@ type routerInfo struct {
 	key     string
 	Router  string
 	Method  string
-	ApiInfo *ApiInfo
+	ApiInfo *FunctionInfo
 }
 
 func fmtKey(router string, method string) string {

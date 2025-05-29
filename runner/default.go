@@ -2,10 +2,10 @@ package runner
 
 import (
 	"fmt"
+	"github.com/yunhanshu-net/function-go/pkg/dto/api"
+	"github.com/yunhanshu-net/function-go/pkg/dto/request"
+	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	constants "github.com/yunhanshu-net/pkg/constants/usercall"
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/api"
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/request"
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/response"
 	"gorm.io/gorm/schema"
 	"strings"
 )
@@ -165,7 +165,7 @@ func (r *Runner) _getApiInfo(ctx *Context, req *request.ApiInfoRequest, resp res
 	return resp.Form(apiInfo).Build()
 }
 
-func getCallbacks(config *ApiInfo) []string {
+func getCallbacks(config *FunctionInfo) []string {
 	var callbacks []string
 	if config == nil {
 		return nil

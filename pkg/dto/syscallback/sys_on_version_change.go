@@ -1,7 +1,7 @@
 package syscallback
 
 import (
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/api"
+	"github.com/yunhanshu-net/function-go/pkg/dto/api"
 )
 
 type SysOnVersionChangeReq struct {

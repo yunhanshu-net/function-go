@@ -2,8 +2,8 @@ package widget
 
 import (
 	"errors"
+	"github.com/yunhanshu-net/function-go/view/widget/types"
 	"github.com/yunhanshu-net/pkg/x/tagx"
-	"github.com/yunhanshu-net/sdk-go/view/widget/types"
 	"strings"
 )
 

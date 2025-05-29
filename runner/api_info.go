@@ -15,7 +15,7 @@ const (
 	OperateTableTypeGet    OperateTableType = "get"    //获取数据
 )
 
-type ApiInfo struct {
+type FunctionInfo struct {
 	Router       string       `json:"router"`
 	Method       string       `json:"method"`
 	ApiDesc      string       `json:"api_desc"`

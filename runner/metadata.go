@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-playground/form/v4"
-	"github.com/yunhanshu-net/sdk-go/pkg/dto/response"
+	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"net/url"
 	"reflect"
 	"sync"
