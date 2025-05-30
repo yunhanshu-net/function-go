@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
-	"github.com/yunhanshu-net/function-go/pkg/logger"
 	"github.com/yunhanshu-net/pkg/constants"
+	"github.com/yunhanshu-net/pkg/logger"
 	"github.com/yunhanshu-net/pkg/x/jsonx"
-	"runtime"
-	"time"
 )
 
 func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
@@ -33,7 +34,7 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 	}
 
 	ticker := time.NewTicker(time.Second * 1)
-	logger.Infof("listen uuid:%s\n", r.uuid)
+	logger.InfoContextf(ctx, "listen uuid:%s\n", r.uuid)
 	defer func() {
 		ticker.Stop()
 		// 使用统一的Shutdown函数而不是单独关闭资源
@@ -43,14 +44,14 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 	for {
 		select {
 		case <-r.down:
-			logger.Infof("%s runcher发起关闭请求，关闭连接", r.uuid)
+			logger.InfoContextf(ctx, "%s runcher发起关闭请求，关闭连接", r.uuid)
 			return
 		case <-ticker.C:
 			if r.idle > 0 {
 				ts := time.Now().Unix()
 				d := ts - r.lastHandelTs.Unix()
 				if (ts - r.lastHandelTs.Unix()) > r.idle { //超过指定空闲时间的话需要释放进程
-					logger.Infof(" %v没有处理消息，runner 自动关闭连接 idle config：%v", d, r.idle)
+					logger.InfoContextf(ctx, " %v没有处理消息，runner 自动关闭连接 idle config：%v", d, r.idle)
 					return
 				}
 			}
@@ -138,7 +139,7 @@ func (r *Runner) runCmd(ctx context.Context, req *request.RunFunctionReq) {
 
 	marshal, err := json.Marshal(resp)
 	if err != nil {
-		logger.Errorf("响应序列化失败: %s", err.Error())
+		logger.ErrorContextf(ctx, "响应序列化失败: %s", err.Error())
 		fmt.Println("<Response>{\"code\":500,\"msg\":\"响应序列化失败\"}</Response>")
 		return
 	}

@@ -4,10 +4,11 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
-	"github.com/yunhanshu-net/function-go/pkg/logger"
 	consts "github.com/yunhanshu-net/pkg/constants/usercall"
+	"github.com/yunhanshu-net/pkg/logger"
 )
 
 //
@@ -138,14 +139,6 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
 		}
-		//if err := req.DecodeData(&reqData); err != nil {
-		//	logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
-		//	return fmt.Errorf("OnApiCreatedReq decode failed: %w", err)
-		//}
-		//
-		//// 记录请求详情
-		//reqDataJSON, _ := json.Marshal(reqData)
-		//logger.InfoContextf(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
 		if err := apiConf.OnApiCreated(ctx, &reqData); err != nil {
 			logger.InfoContextf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)

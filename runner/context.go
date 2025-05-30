@@ -13,7 +13,16 @@ type Context struct {
 	version string
 }
 
-func (c *Context) getDb() string {
+func NewContext(ctx context.Context, user, name, version string) *Context {
+	return &Context{
+		Context: ctx,
+		user:    user,
+		name:    name,
+		version: version,
+	}
+}
+
+func (c *Context) getDBName() string {
 	return fmt.Sprintf("%s_%s.db", c.user, c.name)
 }
 

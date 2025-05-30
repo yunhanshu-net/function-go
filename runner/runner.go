@@ -9,9 +9,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/yunhanshu-net/function-go/env"
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
-	"github.com/yunhanshu-net/function-go/pkg/logger"
 	"github.com/yunhanshu-net/pkg/constants"
 	"github.com/yunhanshu-net/pkg/dto/runnerproject"
+	"github.com/yunhanshu-net/pkg/logger"
 )
 
 // New 创建一个新的Runner实例
@@ -44,23 +44,22 @@ type Runner struct {
 }
 
 func (r *Runner) call(ctx context.Context, msg *nats.Msg) ([]byte, error) {
-
 	data := msg.Data
 	var req request.RunFunctionReq
 	err1 := json.Unmarshal(data, &req)
 	if err1 != nil {
-		logger.Errorf("call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
+		logger.ErrorContextf(ctx, "call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
 		return nil, fmt.Errorf("call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
 	}
 
 	runResponse, err1 := r.runFunction(ctx, &req)
 	if err1 != nil {
-		logger.Errorf("call runRequest err,req:%+v err:%s", req, err1.Error())
+		logger.ErrorContextf(ctx, "call runRequest err,req:%+v err:%s", req, err1.Error())
 		return nil, fmt.Errorf("call runRequest err,req:%+v err:%s", req, err1.Error())
 	}
 	marshal, err1 := json.Marshal(runResponse)
 	if err1 != nil {
-		logger.Errorf("call json.Marshal err,req:%+v err:%s", req, err1.Error())
+		logger.ErrorContextf(ctx, "call json.Marshal err,req:%+v err:%s", req, err1.Error())
 		return nil, fmt.Errorf("call json.Marshal err,req:%+v err:%s", req, err1.Error())
 	}
 
@@ -94,7 +93,7 @@ func (r *Runner) connectNats(ctx context.Context) error {
 	maxRetries := 3
 
 	for i := 0; i < maxRetries; i++ {
-		logger.Infof("正在连接NATS服务器 (尝试: %d/%d)", i+1, maxRetries)
+		logger.InfoContextf(ctx, "正在连接NATS服务器 (尝试: %d/%d)", i+1, maxRetries)
 		connect, err = nats.Connect(nats.DefaultURL, opts...)
 		if err == nil {
 			break
@@ -122,7 +121,7 @@ func (r *Runner) connectNats(ctx context.Context) error {
 		if err != nil {
 			respMsg.Header.Set("code", "-1")
 			respMsg.Header.Set("msg", err.Error())
-			logger.Errorf("处理请求失败: %v", err)
+			logger.ErrorContextf(ctx, "处理请求失败: %v", err)
 		} else {
 			respMsg.Data = rspData
 			respMsg.Header.Set("code", "0")
@@ -136,7 +135,7 @@ func (r *Runner) connectNats(ctx context.Context) error {
 
 		logger.DebugContextf(ctx, "请求处理完成，耗时: %v", time.Since(start))
 	})
-	logger.Infof("已连接到NATS服务器，监听主题: %s", subject)
+	logger.InfoContextf(ctx, "已连接到NATS服务器，监听主题: %s", subject)
 	if err != nil {
 		return fmt.Errorf("无法订阅主题 %s: %w", subject, err)
 	}
@@ -147,9 +146,6 @@ func (r *Runner) connectNats(ctx context.Context) error {
 	// 发送就绪消息
 	msg := nats.NewMsg(r.uuid)
 	msg.Header.Set("code", "0")
-
-	//ctx1, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	//defer cancel()
 
 	respMsg, err := r.natsConn.RequestMsg(msg, time.Second*5)
 

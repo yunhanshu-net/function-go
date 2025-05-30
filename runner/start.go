@@ -3,14 +3,15 @@ package runner
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/yunhanshu-net/function-go/env"
-	"github.com/yunhanshu-net/function-go/pkg/logger"
-	"github.com/yunhanshu-net/pkg/x/jsonx"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/spf13/cobra"
+	"github.com/yunhanshu-net/function-go/env"
+	"github.com/yunhanshu-net/pkg/logger"
+	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
 
 func writeJSON(el interface{}) {
@@ -62,12 +63,24 @@ func newCmd() *cobra.Command {
 var shutdownOnce sync.Once // 确保只关闭一次
 
 func Run() error {
-	//SetupSignalHandler()
+	// 初始化日志
+	logCfg := logger.Config{
+		Level:      "debug",
+		Filename:   "logs/function-go.log",
+		MaxSize:    100,
+		MaxBackups: 10,
+		MaxAge:     30,
+		Compress:   true,
+		IsDev:      !env.IsProd,
+	}
+	if err := logger.Init(logCfg); err != nil {
+		return fmt.Errorf("初始化日志失败: %w", err)
+	}
+
 	initRunner()
 	r.registerBuiltInRouters()
 	if err := cmd.Execute(); err != nil {
-		logger.Fatal(err.Error())
-
+		logger.Fatal(context.Background(), "执行命令失败", err)
 	}
 	Shutdown()
 	return nil
@@ -76,11 +89,11 @@ func Run() error {
 // Shutdown 统一的资源关闭入口，处理所有资源的释放
 func Shutdown() {
 	shutdownOnce.Do(func() {
-		logger.Info("开始执行系统关闭...")
+		logger.Info(context.Background(), "开始执行系统关闭...")
 
 		// 1. 先关闭Runner连接，包括NATS连接等
 		if err := r.close(context.Background()); err != nil {
-			logger.Errorf("关闭Runner连接失败: %v", err)
+			logger.Errorf(context.Background(), "关闭Runner连接失败: %v", err)
 		}
 
 		// 2. 关闭所有数据库连接
@@ -89,7 +102,7 @@ func Shutdown() {
 		// 3. 这里添加其他需要关闭的资源
 		// ...
 
-		logger.Info("系统关闭完成")
+		logger.Info(context.Background(), "系统关闭完成")
 	})
 }
 
@@ -100,7 +113,7 @@ func SetupSignalHandler() {
 
 	go func() {
 		sig := <-c
-		logger.Infof("收到信号: %v, 开始优雅退出...", sig)
+		logger.Infof(context.Background(), "收到信号: %v, 开始优雅退出...", sig)
 		Shutdown()
 		os.Exit(0)
 	}()
