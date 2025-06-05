@@ -44,9 +44,9 @@ func (p *FormRequestParams) JSONRawMessage() (json.RawMessage, error) {
 	return marshal, nil
 }
 
-func newFormRequestParamInfo(tag *tagx.RunnerFieldInfo, renderType string) (*FormRequestParamInfo, error) {
+func newFormRequestParamInfo(tag *tagx.RunnerFieldInfo) (*FormRequestParamInfo, error) {
 
-	widgetIns, err := widget.NewWidget(tag, renderType)
+	widgetIns, err := widget.NewWidget(tag, response.RenderTypeForm)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func NewFormRequestParams(el interface{}, renderType string) (*FormRequestParams
 			searchCond = append(searchCond, field.GetCode())
 			continue
 		}
-		info, err := newFormRequestParamInfo(field, renderType)
+		info, err := newFormRequestParamInfo(field)
 		if err != nil {
 			return nil, err
 		}

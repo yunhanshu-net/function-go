@@ -15,10 +15,11 @@ type TableWidget struct {
 
 // TableColumn 表格列定义
 type TableColumn struct {
-	Code      string `json:"code"`
-	Name      string `json:"name"`
-	ValueType string `json:"value_type"`
-
+	Code          string      `json:"code"`
+	Name          string      `json:"name"`
+	ValueType     string      `json:"value_type"`
+	AddFormConfig interface{} `json:"add_form_config"`
+	//AddFormConfig *api.FormRequestParamInfo `json:"add_form_config"`
 	//// 列标识
 	//Prop string `json:"prop"`
 	//// 列标题

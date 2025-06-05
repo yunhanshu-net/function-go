@@ -2,10 +2,11 @@ package response
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/yunhanshu-net/pkg/query"
 	"github.com/yunhanshu-net/pkg/x/tagx"
 	"gorm.io/gorm"
-	"reflect"
 )
 
 type Table interface {
@@ -129,7 +130,14 @@ func parserTableInfo(row interface{}) []column {
 	var columns []column
 	for i := 0; i < of.NumField(); i++ {
 		field := of.Field(i)
-		kv := tagx.ParserKv(field.Tag.Get("runner"))
+
+		// 检查runner标签是否为"-"，如果是则忽略该字段
+		runnerTag := field.Tag.Get("runner")
+		if runnerTag == "-" {
+			continue
+		}
+
+		kv := tagx.ParserKv(runnerTag)
 		name := kv["name"]
 		code := kv["code"]
 		if name == "" {
@@ -139,9 +147,9 @@ func parserTableInfo(row interface{}) []column {
 			}
 		}
 		if code == "" {
-			name = field.Tag.Get("json")
-			if name == "" {
-				name = field.Name
+			code = field.Tag.Get("json")
+			if code == "" {
+				code = field.Name
 			}
 		}
 

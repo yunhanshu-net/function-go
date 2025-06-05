@@ -34,7 +34,7 @@ func NewTableRequestParams(el interface{}) (*TableRequestParams, error) {
 			searchCond = append(searchCond, field.GetCode())
 			continue
 		}
-		info, err := newFormRequestParamInfo(field, response.RenderTypeTable)
+		info, err := newFormRequestParamInfo(field)
 		if err != nil {
 			return nil, err
 		}

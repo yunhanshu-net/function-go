@@ -3,6 +3,7 @@ package usercall
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
 
 type OnPageLoadReq struct {
@@ -64,11 +65,26 @@ type OnInputValidateReq struct {
 }
 
 type OnTableDeleteRowsReq struct {
-	Ids []string `json:"ids"`
+	Ids []int `json:"ids"`
 }
 
-type OnTableUpdateRowReq struct {
-	Ids []string `json:"ids"`
+type OnTableUpdateRowsReq struct {
+	Ids    []int                  `json:"ids"`
+	Fields map[string]interface{} `json:"fields"` // 要更新的字段和值的映射
+}
+type OnTableAddRowsReq struct {
+	Rows interface{} `json:"rows"`
+}
+
+type OnTableAddRowsResp struct {
+}
+
+func (r *OnTableAddRowsReq) DecodeBy(el interface{}) error {
+	err := jsonx.Convert(r.Rows, el)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type OnTableSearchReq struct {
@@ -96,4 +112,21 @@ func (c *Request) DecodeData(el interface{}) error {
 type Response struct {
 	Request  interface{} `json:"request"`
 	Response interface{} `json:"response"`
+}
+
+type OnInputFuzzyResp struct {
+	Values []string `json:"values"`
+}
+
+type OnInputValidateResp struct {
+	Msg string `json:"msg"`
+}
+
+type OnTableDeleteRowsResp struct {
+}
+
+type OnTableUpdateRowsResp struct {
+}
+
+type OnTableSearchResp struct {
 }

@@ -17,6 +17,7 @@ func (r *Runner) registerBuiltInRouters() {
 	r.get("/_getApiInfos", r._getApiInfos)
 	r.get("/_getApiInfo", r._getApiInfo)
 	r.post("/_callback", r._callback)
+	//r.post("/_syscall", r._syscall)
 }
 func _env(ctx *Context, req *request.NoData, resp response.Response) error {
 	return resp.Form(map[string]string{"version": "1.0", "lang": "go"}).Build()
@@ -83,8 +84,6 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 			apiInfo.UseTables = append(apiInfo.UseTables, tb.TableName())
 		}
 	}
-	apiInfo.UseDB = config.UseDB
-
 	// 获取数据表信息
 	for _, table := range config.CreateTables { //记录函数创建的表
 		if tb, ok := table.(schema.Tabler); ok {
@@ -92,8 +91,11 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 		}
 	}
 	for table, crud := range config.OperateTables { //记录函数对表的crud操作
+		apiInfo.OperateTables = make(map[string][]string)
 		if tb, ok := table.(schema.Tabler); ok {
-			apiInfo.OperateTables[tb.TableName()] = crud
+			for _, c := range crud {
+				apiInfo.OperateTables[tb.TableName()] = append(apiInfo.OperateTables[tb.TableName()], string(c))
+			}
 		}
 	}
 
@@ -201,13 +203,23 @@ func getCallbacks(config *FunctionInfo) []string {
 		callbacks = append(callbacks, constants.CallbackTypeOnVersionChange)
 	}
 
-	// 表格操作回调
-	if config.OnTableDeleteRows != nil {
+	if config.AutoCrudTable != nil {
+		callbacks = append(callbacks, constants.CallbackTypeOnTableAddRows)
 		callbacks = append(callbacks, constants.CallbackTypeOnTableDeleteRows)
+		callbacks = append(callbacks, constants.CallbackTypeOnTableUpdateRows)
+	} else {
+		// 表格操作回调
+		if config.OnTableDeleteRows != nil {
+			callbacks = append(callbacks, constants.CallbackTypeOnTableDeleteRows)
+		}
+		if config.OnTableUpdateRows != nil {
+			callbacks = append(callbacks, constants.CallbackTypeOnTableUpdateRows)
+		}
+		if config.OnTableAddRows != nil {
+			callbacks = append(callbacks, constants.CallbackTypeOnTableAddRows)
+		}
 	}
-	if config.OnTableUpdateRow != nil {
-		callbacks = append(callbacks, constants.CallbackTypeOnTableUpdateRow)
-	}
+
 	if config.OnTableSearch != nil {
 		callbacks = append(callbacks, constants.CallbackTypeOnTableSearch)
 	}

@@ -35,5 +35,20 @@ func NewTableResponseParams(el interface{}) (*TableResponseParams, error) {
 	if err != nil {
 		return nil, err
 	}
+	mp := make(map[string]interface{})
+	for _, field := range fields {
+		info, err := newFormRequestParamInfo(field)
+		if err != nil {
+			continue
+		}
+		mp[field.GetCode()] = info
+	}
+	for i, column := range table.Columns {
+		v, ok := mp[column.Code]
+		if !ok {
+			continue
+		}
+		table.Columns[i].AddFormConfig = v
+	}
 	return &TableResponseParams{TableWidget: table}, nil
 }

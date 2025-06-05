@@ -3,6 +3,8 @@ package runner
 import (
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
+	"github.com/yunhanshu-net/pkg/logger"
+	"gorm.io/gorm/schema"
 	"strings"
 )
 
@@ -12,6 +14,29 @@ type routerInfo struct {
 	Router  string
 	Method  string
 	ApiInfo *FunctionInfo
+}
+
+func (r *routerInfo) CreateTables(ctx *Context) error {
+	if r.ApiInfo == nil {
+		return nil
+	}
+	if r.ApiInfo.CreateTables == nil {
+		return nil
+	}
+	for _, table := range r.ApiInfo.CreateTables {
+		err := ctx.MustGetOrInitDB().AutoMigrate(table)
+		if err != nil {
+			logger.Errorf(ctx, "create table %+v  error: %v", table, err)
+		}
+		tabler, ok := table.(schema.Tabler)
+		if !ok {
+			logger.Errorf(ctx, "create table %+v  error: %v", table, err)
+			continue
+		}
+		logger.Infof(ctx, "CreateTables create table %s success", tabler.TableName())
+	}
+	return nil
+
 }
 
 func fmtKey(router string, method string) string {

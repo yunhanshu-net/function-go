@@ -14,7 +14,16 @@ func NewWidget(info *tagx.RunnerFieldInfo, renderType string) (Widget, error) {
 
 	switch renderType {
 	case response.RenderTypeTable:
-
+		switch widgetType {
+		case WidgetInput:
+			return NewInputWidget(info)
+		//case WidgetCheckbox:
+		//	return newCheckboxWidget(info)
+		//case WidgetRadio:
+		//	return newRadioWidget(info)
+		case WidgetSelect:
+			return NewSelectWidget(info)
+		}
 	case response.RenderTypeForm:
 		switch widgetType {
 		case WidgetInput:
