@@ -22,7 +22,7 @@ type InputWidget struct {
 	//input
 	//输入框的类型，常规输入框还是文本域
 	//line_text(默认),text_area
-	Mode string `json:"mode"`
+	Mode string `json:"mode"` //line_text / text_area / password
 	//占位符（文本框提示信息）
 	Placeholder string `json:"placeholder"`
 	//默认值

@@ -16,17 +16,21 @@ type FormRequestParamInfo struct {
 	Code string `json:"code"`
 	//中文名称
 	Name string `json:"name"`
-	//中文介绍
+
+	//介绍
 	Desc string `json:"desc"`
 	//是否必填
-	Required bool `json:"required"`
+	Required     bool        `json:"required"`      //是否必填
+	DefaultValue interface{} `json:"default_value"` //默认值
+	Callbacks    string      `json:"callbacks"`     //字段级别的回调，多个用逗号分隔，ps OnInputFuzzy,OnInputFocus 等等，（还没实现）
+	Validates    string      `json:"validates"`     //验证规则
+	WidgetConfig interface{} `json:"widget_config"` //这里是widget.Widget类型的接口，需要实现Widget接口，这里可以是每个不同组件的个性化属性
+	WidgetType   string      `json:"widget_type"`   //组件类型
+	ValueType    string      `json:"value_type"`    //type 类型
+	Example      string      `json:"example"`       //示例值
 
-	Callbacks    string      `json:"callbacks"`
-	Validates    string      `json:"validates"`
-	WidgetConfig interface{} `json:"widget_config"` //这里是widget.Widget类型的接口
-	WidgetType   string      `json:"widget_type"`
-	ValueType    string      `json:"value_type"`
-	Example      string      `json:"example"`
+	Show   string `json:"show"`   //是否展示 create,update,list (仅仅在这三个场景显示) 为空表示全部显示，如果想隐藏用hidden来控制
+	Hidden string `json:"hidden"` //是否隐藏 all(全部隐藏)
 }
 
 type FormRequestParams struct {
@@ -54,6 +58,9 @@ func newFormRequestParamInfo(tag *tagx.RunnerFieldInfo) (*FormRequestParamInfo, 
 		Code:         tag.GetCode(),
 		Name:         tag.GetName(),
 		Desc:         tag.GetDesc(),
+		Show:         tag.GetShow(),
+		Hidden:       tag.GetHidden(),
+		DefaultValue: tag.GetDefaultValue(),
 		Required:     tag.GetRequired(),
 		Validates:    tag.GetValidates(),
 		Callbacks:    tag.GetCallbacks(),

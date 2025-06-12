@@ -97,7 +97,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			Multiple bool        `json:"multiple"` //是否多返回值
 			Request  interface{} `json:"request"`  //会初始化前端的表单参数
 			Response interface{} `json:"response"` //会初始化前端的的响应参数
-			AuthRun  bool        `json:"auth_run"` //是否自动运行
+			AutoRun  bool        `json:"auto_run"` //是否自动运行
 		}
 
 		if rsp == nil {
@@ -107,7 +107,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			Multiple: userResp.Multiple,
 			Request:  rsp.Request,
 			Response: userResp.GetData(),
-			AuthRun:  rsp.AuthRun,
+			AutoRun:  rsp.AutoRun,
 		}
 		return resp.Form(rs).Build()
 

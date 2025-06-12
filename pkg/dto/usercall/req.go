@@ -11,7 +11,7 @@ type OnPageLoadReq struct {
 
 type OnPageLoadResp struct {
 	Request interface{} `json:"request"`  //会初始化前端的表单参数
-	AuthRun bool        `json:"auth_run"` //是否自动运行
+	AutoRun bool        `json:"auto_run"` //是否自动运行
 }
 
 type OnApiCreatedReq struct {

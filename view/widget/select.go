@@ -13,7 +13,6 @@ type SelectWidget struct {
 	Options []string `json:"options"`
 	// 是否多选
 	Multiple bool `json:"multiple,omitempty"`
-
 	// 默认值
 	DefaultValue string `json:"default_value,omitempty"`
 }

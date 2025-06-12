@@ -5,6 +5,7 @@ go 1.23.4
 replace github.com/yunhanshu-net/pkg => ../pkg
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-playground/form/v4 v4.2.1
 	github.com/nats-io/nats.go v1.42.0
 	github.com/pkg/errors v0.9.1
