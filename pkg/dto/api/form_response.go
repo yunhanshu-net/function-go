@@ -3,11 +3,10 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yunhanshu-net/function-go/pkg/dto/response"
-	"github.com/yunhanshu-net/function-go/view/widget"
-	"github.com/yunhanshu-net/pkg/x/tagx"
 	"reflect"
 	"strings"
+
+	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 )
 
 type FormResponseParamInfo struct {
@@ -43,31 +42,31 @@ func (p *FormResponseParams) JSONRawMessage() (json.RawMessage, error) {
 	return marshal, nil
 }
 
-func newFormResponseParamInfo(tag *tagx.RunnerFieldInfo) (*FormResponseParamInfo, error) {
-
-	widgetIns, err := widget.NewWidget(tag, response.RenderTypeForm)
-	if err != nil {
-		return nil, err
+// newFormResponseParamInfo 使用新的FieldInfo创建响应参数信息
+func newFormResponseParamInfo(fieldInfo *FieldInfo) (*FormResponseParamInfo, error) {
+	// 处理回调配置
+	var callbacks []string
+	for _, callback := range fieldInfo.Callbacks {
+		callbacks = append(callbacks, callback.Event)
 	}
 
 	param := &FormResponseParamInfo{
-		Code:         tag.GetCode(),
-		Name:         tag.GetName(),
-		Desc:         tag.GetDesc(),
-		Required:     tag.GetRequired(),
-		Validates:    tag.GetValidates(),
-		Callbacks:    tag.GetCallbacks(),
-		WidgetConfig: widgetIns,
-		WidgetType:   widgetIns.GetWidgetType(),
-		ValueType:    tag.GetValueType(),
-		Example:      tag.GetExample(),
+		Code:         fieldInfo.Code,
+		Name:         fieldInfo.Name,
+		Desc:         fieldInfo.Desc,
+		Required:     fieldInfo.IsRequired(),
+		Validates:    fieldInfo.Validation,
+		Callbacks:    strings.Join(callbacks, ";"),
+		WidgetConfig: fieldInfo.Widget.Config,
+		WidgetType:   fieldInfo.Widget.Type,
+		ValueType:    fieldInfo.Data.Type,
+		Example:      fieldInfo.Data.Example,
 	}
 
 	return param, nil
 }
 
 func NewFormResponseParams(el interface{}) (*FormResponseParams, error) {
-	//renderType = stringsx.DefaultString(renderType, response.RenderTypeForm)
 	rspType := reflect.TypeOf(el)
 	if rspType.Kind() == reflect.Pointer {
 		rspType = rspType.Elem()
@@ -76,36 +75,48 @@ func NewFormResponseParams(el interface{}) (*FormResponseParams, error) {
 		return nil, fmt.Errorf("输出参数仅支持Struct和Slice类型")
 	}
 
-	var tags []*tagx.RunnerFieldInfo
+	// 使用新的FormBuilder构建表单配置
+	builder := NewFormBuilder()
+	var formConfig *FormConfig
+	var err error
+
 	if rspType.Kind() == reflect.Struct {
-		resFields, err := tagx.ParseStructFieldsTypeOf(rspType, "runner")
+		formConfig, err = builder.BuildFormConfig(rspType, response.RenderTypeForm)
 		if err != nil {
 			return nil, err
 		}
-		tags = resFields
 	} else {
-		tp, err := tagx.GetSliceElementType(el)
+		// 处理切片类型，获取元素类型
+		elemType := rspType.Elem()
+		if elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
+		formConfig, err = builder.BuildFormConfig(elemType, response.RenderTypeForm)
 		if err != nil {
 			return nil, err
 		}
-		of, err := tagx.ParseStructFieldsTypeOf(tp, "runner")
-		if err != nil {
-			return nil, err
-		}
-		tags = of
 	}
+
 	var searchCond []string
-	children := make([]*FormResponseParamInfo, 0, len(tags))
-	for _, field := range tags {
-		if field.IsSearchCond() {
-			searchCond = append(searchCond, field.GetCode())
+	children := make([]*FormResponseParamInfo, 0, len(formConfig.Fields))
+
+	for _, fieldInfo := range formConfig.Fields {
+		// 检查是否为搜索条件字段
+		if fieldInfo.IsSearchField() {
+			searchCond = append(searchCond, fieldInfo.Code)
 			continue
 		}
-		info, err := newFormResponseParamInfo(field)
+
+		info, err := newFormResponseParamInfo(fieldInfo)
 		if err != nil {
 			return nil, err
 		}
 		children = append(children, info)
 	}
-	return &FormResponseParams{SearchCondList: strings.Join(searchCond, ","), RenderType: response.RenderTypeForm, Children: children}, nil
+
+	return &FormResponseParams{
+		SearchCondList: strings.Join(searchCond, ","),
+		RenderType:     response.RenderTypeForm,
+		Children:       children,
+	}, nil
 }

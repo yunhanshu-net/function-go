@@ -7,9 +7,10 @@ var (
 		ValueFloat,
 		ValueBoolean,
 		ValueArray,
+		ValueStrings,
 		ValueObject,
 		ValueTime,
-		ValueFile,
+		ValueFiles,
 	}
 )
 
@@ -31,15 +32,16 @@ const (
 	// ValueBoolean 布尔类型
 	ValueBoolean = "boolean"
 	// ValueArray 数组类型
-	ValueArray = "array"
+	ValueArray   = "array"
+	ValueStrings = "[]string"
 	// ValueObject 对象类型
 	ValueObject = "object"
 	// ValueTime 时间类型
 	ValueTime = "time"
 	// ValueFloat 浮点数类型
 	ValueFloat = "float"
-	// ValueFile 文件类型
-	ValueFile = "file"
+	// ValueFiles 文件类型
+	ValueFiles = "files"
 )
 
 // UseValueType 这里需要判断，假如请求字段是go的int类型，但是用户不小心在tag里把类型写成string类型了，这时候，我们不应该应用用户的类型，

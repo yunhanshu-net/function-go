@@ -1,74 +1,61 @@
 package widget
 
-import "github.com/yunhanshu-net/pkg/x/tagx"
+import (
+	"strings"
+
+	"github.com/yunhanshu-net/pkg/x/tagx"
+)
 
 // SwitchWidget 开关组件
 type SwitchWidget struct {
-	// 组件类型，固定为switch
-	Widget string `json:"widget"`
-	// 数据类型，一般为boolean
-	Type string `json:"type"`
-	// 打开时的文字
-	ActiveText string `json:"active_text,omitempty"`
-	// 关闭时的文字
-	InactiveText string `json:"inactive_text,omitempty"`
-	// 打开时的值
-	ActiveValue interface{} `json:"active_value,omitempty"`
-	// 关闭时的值
-	InactiveValue interface{} `json:"inactive_value,omitempty"`
-	// 打开时的颜色
-	ActiveColor string `json:"active_color,omitempty"`
-	// 关闭时的颜色
-	InactiveColor string `json:"inactive_color,omitempty"`
-	// 默认值
-	DefaultValue interface{} `json:"default_value,omitempty"`
-	// 是否禁用
-	Disabled bool `json:"disabled,omitempty"`
-	// 尺寸：large, default, small
-	Size string `json:"size,omitempty"`
-	// 是否显示内部文字
-	InlinePrompt bool `json:"inline_prompt,omitempty"`
+	// 显示配置
+	TrueLabel  string `json:"true_label"`  // true状态的显示文本，默认"开启"
+	FalseLabel string `json:"false_label"` // false状态的显示文本，默认"关闭"
+
+	// 默认值配置
+	DefaultValue bool `json:"default_value"` // 默认值，支持true/false，默认为false
+
+	// 交互配置
+	Disabled bool `json:"disabled"` // 是否禁用
 }
 
 // newSwitchWidget 创建开关组件
 func newSwitchWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
-	switch_ := &SwitchWidget{
-		Widget: WidgetSwitch,
-		Type:   TypeBoolean,
+	switchWidget := &SwitchWidget{
+		TrueLabel:    "开启",  // 默认true状态文本
+		FalseLabel:   "关闭",  // 默认false状态文本
+		DefaultValue: false, // 默认为关闭状态
+	}
+
+	if info.Tags == nil {
+		return switchWidget, nil
 	}
 
 	tag := info.Tags
-	if tag["active_text"] != "" {
-		switch_.ActiveText = tag["active_text"]
+
+	// 设置true状态文本
+	if trueLabel, ok := tag["true_label"]; ok && trueLabel != "" {
+		switchWidget.TrueLabel = strings.TrimSpace(trueLabel)
 	}
 
-	if tag["inactive_text"] != "" {
-		switch_.InactiveText = tag["inactive_text"]
+	// 设置false状态文本
+	if falseLabel, ok := tag["false_label"]; ok && falseLabel != "" {
+		switchWidget.FalseLabel = strings.TrimSpace(falseLabel)
 	}
 
-	if tag["active_color"] != "" {
-		switch_.ActiveColor = tag["active_color"]
+	// 设置默认值
+	if defaultValue, ok := tag["default_value"]; ok {
+		switchWidget.DefaultValue = defaultValue == "true"
 	}
 
-	if tag["inactive_color"] != "" {
-		switch_.InactiveColor = tag["inactive_color"]
+	// 设置是否禁用
+	if disabled, ok := tag["disabled"]; ok {
+		switchWidget.Disabled = disabled == "true"
 	}
 
-	if tag["default_value"] != "" {
-		switch_.DefaultValue = tag["default_value"] == "true"
-	}
-
-	if tag["size"] != "" {
-		switch_.Size = tag["size"]
-	}
-
-	return switch_, nil
-}
-
-func (w *SwitchWidget) GetValueType() string {
-	return w.Type
+	return switchWidget, nil
 }
 
 func (w *SwitchWidget) GetWidgetType() string {
-	return w.Widget
+	return WidgetSwitch
 }

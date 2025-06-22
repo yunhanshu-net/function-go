@@ -48,18 +48,18 @@ func (r *Runner) call(ctx context.Context, msg *nats.Msg) ([]byte, error) {
 	var req request.RunFunctionReq
 	err1 := json.Unmarshal(data, &req)
 	if err1 != nil {
-		logger.ErrorContextf(ctx, "call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
+		logger.Errorf(ctx, "call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
 		return nil, fmt.Errorf("call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
 	}
 
 	runResponse, err1 := r.runFunction(ctx, &req)
 	if err1 != nil {
-		logger.ErrorContextf(ctx, "call runRequest err,req:%+v err:%s", req, err1.Error())
+		logger.Errorf(ctx, "call runRequest err,req:%+v err:%s", req, err1.Error())
 		return nil, fmt.Errorf("call runRequest err,req:%+v err:%s", req, err1.Error())
 	}
 	marshal, err1 := json.Marshal(runResponse)
 	if err1 != nil {
-		logger.ErrorContextf(ctx, "call json.Marshal err,req:%+v err:%s", req, err1.Error())
+		logger.Errorf(ctx, "call json.Marshal err,req:%+v err:%s", req, err1.Error())
 		return nil, fmt.Errorf("call json.Marshal err,req:%+v err:%s", req, err1.Error())
 	}
 
@@ -77,13 +77,13 @@ func (r *Runner) connectNats(ctx context.Context) error {
 		nats.ReconnectWait(time.Second),
 		nats.MaxReconnects(10),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-			logger.WarnContextf(ctx, "NATS连接断开: %v", err)
+			logger.Warnf(ctx, "NATS连接断开: %v", err)
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			logger.InfoContextf(ctx, "NATS已重新连接")
+			logger.Infof(ctx, "NATS已重新连接")
 		}),
 		nats.ErrorHandler(func(nc *nats.Conn, sub *nats.Subscription, err error) {
-			logger.ErrorContextf(ctx, "NATS错误: %v", err)
+			logger.Errorf(ctx, "NATS错误: %v", err)
 		}),
 	}
 
@@ -93,12 +93,12 @@ func (r *Runner) connectNats(ctx context.Context) error {
 	maxRetries := 3
 
 	for i := 0; i < maxRetries; i++ {
-		logger.InfoContextf(ctx, "正在连接NATS服务器 (尝试: %d/%d)", i+1, maxRetries)
+		logger.Infof(ctx, "正在连接NATS服务器 (尝试: %d/%d)", i+1, maxRetries)
 		connect, err = nats.Connect(nats.DefaultURL, opts...)
 		if err == nil {
 			break
 		}
-		logger.WarnContextf(ctx, "NATS连接失败，将在1秒后重试: %v", err)
+		logger.Warnf(ctx, "NATS连接失败，将在1秒后重试: %v", err)
 		time.Sleep(time.Second)
 	}
 
@@ -121,7 +121,7 @@ func (r *Runner) connectNats(ctx context.Context) error {
 		if err != nil {
 			respMsg.Header.Set("code", "-1")
 			respMsg.Header.Set("msg", err.Error())
-			logger.ErrorContextf(ctx, "处理请求失败: %v", err)
+			logger.Errorf(ctx, "处理请求失败: %v", err)
 		} else {
 			respMsg.Data = rspData
 			respMsg.Header.Set("code", "0")
@@ -129,20 +129,20 @@ func (r *Runner) connectNats(ctx context.Context) error {
 
 		// 响应请求
 		if err := msg.RespondMsg(respMsg); err != nil {
-			logger.ErrorContextf(ctx, "响应请求失败: %v", err)
+			logger.Errorf(ctx, "响应请求失败: %v", err)
 			return
 		}
 
-		logger.DebugContextf(ctx, "请求处理完成，耗时: %v", time.Since(start))
+		logger.Debugf(ctx, "请求处理完成，耗时: %v", time.Since(start))
 	})
-	logger.InfoContextf(ctx, "已连接到NATS服务器，监听主题: %s", subject)
+	logger.Infof(ctx, "已连接到NATS服务器，监听主题: %s", subject)
 	if err != nil {
 		return fmt.Errorf("无法订阅主题 %s: %w", subject, err)
 	}
 
 	r.natsSubscribe = subscribe
 
-	logger.InfoContextf(ctx, "uuid: %s", r.uuid)
+	logger.Infof(ctx, "uuid: %s", r.uuid)
 	// 发送就绪消息
 	msg := nats.NewMsg(r.uuid)
 	msg.Header.Set("code", "0")
@@ -154,7 +154,7 @@ func (r *Runner) connectNats(ctx context.Context) error {
 	}
 
 	if respMsg.Header.Get("code") == "0" {
-		logger.InfoContextf(ctx, "NATS连接成功，主题: %s，耗时: %v", subject, time.Since(now))
+		logger.Infof(ctx, "NATS连接成功，主题: %s，耗时: %v", subject, time.Since(now))
 	} else {
 		errMsg := respMsg.Header.Get("msg")
 		return fmt.Errorf("NATS连接处理错误: %s", errMsg)
@@ -167,7 +167,7 @@ func (r *Runner) connectNats(ctx context.Context) error {
 func (r *Runner) close(ctx context.Context) error {
 	// 防止重复关闭
 	if r.isClosed {
-		logger.DebugContextf(ctx, "Runner已经关闭，跳过")
+		logger.Debugf(ctx, "Runner已经关闭，跳过")
 		return nil
 	}
 
@@ -183,7 +183,7 @@ func (r *Runner) close(ctx context.Context) error {
 		r.natsSubscribe = nil // 立即置空，防止重复关闭
 
 		if err := subToClose.Drain(); err != nil {
-			logger.DebugContextf(ctx, "清理订阅时出错: %v", err)
+			logger.Debugf(ctx, "清理订阅时出错: %v", err)
 			closeErr = fmt.Errorf("清理订阅错误: %w", err)
 			// 继续执行，不中断关闭流程
 		}
@@ -210,17 +210,17 @@ func (r *Runner) close(ctx context.Context) error {
 
 			// 尝试发送关闭通知，但不强制要求成功
 			if msg, err := connToClose.RequestMsgWithContext(ctx1, newMsg); err != nil {
-				logger.DebugContextf(ctx, "发送关闭通知失败: %v", err)
+				logger.Debugf(ctx, "发送关闭通知失败: %v", err)
 			} else if msg.Header.Get("code") != "0" {
-				logger.DebugContextf(ctx, "关闭Runner返回错误: %s", msg.Header.Get("msg"))
+				logger.Debugf(ctx, "关闭Runner返回错误: %s", msg.Header.Get("msg"))
 			}
 		}
 
 		// 2.2 关闭连接
 		connToClose.Close()
-		logger.InfoContextf(ctx, "NATS连接已关闭")
+		logger.Infof(ctx, "NATS连接已关闭")
 	}
 
-	logger.InfoContextf(ctx, "Runner资源清理完成，耗时: %v", time.Since(now))
+	logger.Infof(ctx, "Runner资源清理完成，耗时: %v", time.Since(now))
 	return closeErr
 }

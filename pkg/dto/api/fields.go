@@ -2,36 +2,41 @@ package api
 
 import (
 	"fmt"
-	"github.com/yunhanshu-net/pkg/x/tagx"
 	"reflect"
 )
 
-func GetFields(el interface{}) ([]*tagx.RunnerFieldInfo, error) {
+// GetFields 获取字段信息，使用新的多标签解析器
+func GetFields(el interface{}) ([]*FieldInfo, error) {
 	rspType := reflect.TypeOf(el)
 	if rspType.Kind() == reflect.Pointer {
 		rspType = rspType.Elem()
 	}
+
 	if rspType.Kind() != reflect.Struct && rspType.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("输出参数仅支持Struct和Slice类型")
 	}
 
-	var tags []*tagx.RunnerFieldInfo
+	// 使用新的FormBuilder构建表单配置
+	builder := NewFormBuilder()
+	var formConfig *FormConfig
+	var err error
+
 	if rspType.Kind() == reflect.Struct {
-		resFields, err := tagx.ParseStructFieldsTypeOf(rspType, "runner")
+		formConfig, err = builder.BuildFormConfig(rspType, "form")
 		if err != nil {
 			return nil, err
 		}
-		tags = resFields
 	} else {
-		tp, err := tagx.GetSliceElementType(el)
+		// 处理切片类型，获取元素类型
+		elemType := rspType.Elem()
+		if elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
+		formConfig, err = builder.BuildFormConfig(elemType, "form")
 		if err != nil {
 			return nil, err
 		}
-		of, err := tagx.ParseStructFieldsTypeOf(tp, "runner")
-		if err != nil {
-			return nil, err
-		}
-		tags = of
 	}
-	return tags, nil
+
+	return formConfig.Fields, nil
 }

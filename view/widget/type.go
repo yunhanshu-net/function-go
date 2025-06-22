@@ -6,7 +6,6 @@ const (
 	WidgetInput = "input"
 	// WidgetCheckbox 多选框
 	WidgetCheckbox = "checkbox"
-
 	// WidgetRadio 单选框
 	WidgetRadio = "radio"
 	// WidgetSelect 下拉框
@@ -15,8 +14,16 @@ const (
 	WidgetSwitch = "switch"
 	// WidgetSlider 滑块
 	WidgetSlider = "slider"
-	// WidgetFile 文件上传组件
-	WidgetFile = "file"
+	// WidgetColor 颜色选择器
+	WidgetColor = "color"
+	// WidgetMultiSelect 多选下拉框
+	WidgetMultiSelect = "multiselect"
+	// WidgetTag 标签组件
+	WidgetTag = "tag"
+	// WidgetFileUpload 文件上传组件
+	WidgetFileUpload = "file_upload"
+	// WidgetFileDisplay 文件展示组件
+	WidgetFileDisplay = "file_display"
 )
 
 // 表格组件类型
@@ -69,6 +76,6 @@ const (
 	TypeTime = "time"
 	// TypeFloat 浮点数类型
 	TypeFloat = "float"
-	// TypeFile 文件类型
-	TypeFile = "file"
+	// TypeFiles 文件类型（复数形式，表示可能是多个文件）
+	TypeFiles = "files"
 )

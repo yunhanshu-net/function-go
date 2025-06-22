@@ -55,12 +55,12 @@ type OnVersionChangeReq struct {
 }
 
 type OnInputFuzzyReq struct {
-	Key   string `json:"key"`
+	Code  string `json:"code"`
 	Value string `json:"value"`
 }
 
 type OnInputValidateReq struct {
-	Key   string `json:"key"`
+	Code  string `json:"code"`
 	Value string `json:"value"`
 }
 
@@ -114,8 +114,11 @@ type Response struct {
 	Response interface{} `json:"response"`
 }
 
+type InputFuzzyItem struct {
+	Value string `json:"value"`
+}
 type OnInputFuzzyResp struct {
-	Values []string `json:"values"`
+	Values []*InputFuzzyItem `json:"values"`
 }
 
 type OnInputValidateResp struct {

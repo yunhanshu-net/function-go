@@ -1,14 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
+	"github.com/yunhanshu-net/pkg/logger"
+	"strings"
+
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/view/widget"
-	"github.com/yunhanshu-net/pkg/x/stringsx"
 	"github.com/yunhanshu-net/pkg/x/tagx"
-	"reflect"
-	"strings"
 )
 
 type FormRequestParamInfo struct {
@@ -48,6 +48,84 @@ func (p *FormRequestParams) JSONRawMessage() (json.RawMessage, error) {
 	return marshal, nil
 }
 
+// ToFormRequestParamInfo 将 FieldInfo 转换为 FormRequestParamInfo（向下兼容）
+func (f *FieldInfo) ToFormRequestParamInfo() *FormRequestParamInfo {
+	// 转换回调为字符串格式
+	var callbackStrings []string
+	for _, callback := range f.Callbacks {
+		callbackStrings = append(callbackStrings, callback.Event)
+	}
+	callbacksStr := strings.Join(callbackStrings, ",")
+
+	// 转换权限为旧格式
+	var show, hidden string
+	if f.Permission != nil {
+		var showParts []string
+		if f.Permission.Create {
+			showParts = append(showParts, "create")
+		}
+		if f.Permission.Update {
+			showParts = append(showParts, "update")
+		}
+		if f.Permission.Read {
+			showParts = append(showParts, "list")
+		}
+		show = strings.Join(showParts, ",")
+
+		// 如果没有任何权限，设置为隐藏
+		if !f.Permission.Read && !f.Permission.Update && !f.Permission.Create {
+			hidden = "all"
+		}
+	}
+
+	// 处理默认值
+	var defaultValue interface{}
+	if f.Data.DefaultValue != "" {
+		defaultValue = f.Data.DefaultValue
+	}
+
+	return &FormRequestParamInfo{
+		Code:         f.Code,
+		Name:         f.Name,
+		Desc:         f.Desc,
+		Required:     strings.Contains(f.Validation, "required"),
+		DefaultValue: defaultValue,
+		Callbacks:    callbacksStr,
+		Validates:    f.Validation,
+		WidgetConfig: f.Widget.Config,
+		WidgetType:   f.Widget.Type,
+		ValueType:    f.Data.Type,
+		Example:      f.Data.Example,
+		Show:         show,
+		Hidden:       hidden,
+	}
+}
+
+// NewFormRequestParams 兼容旧接口 - 使用新的FormBuilder但返回旧格式
+func NewFormRequestParams(el interface{}, renderType string) (*FormRequestParams, error) {
+	// 使用新的统一响应
+	unifiedResponse, err := NewUnifiedFormResponse(el, renderType)
+	if err != nil {
+		logger.Errorf(context.Background(), "NewFormRequestParams error: %+v", err)
+		return nil, err
+	}
+
+	// 转换为旧格式
+	children := make([]*FormRequestParamInfo, 0, len(unifiedResponse.Fields))
+	for _, field := range unifiedResponse.Fields {
+		children = append(children, field.ToFormRequestParamInfo())
+	}
+
+	// 处理搜索条件
+	searchCondList := strings.Join(unifiedResponse.SearchConditions, ",")
+
+	return &FormRequestParams{
+		SearchCondList: searchCondList,
+		RenderType:     unifiedResponse.RenderType,
+		Children:       children,
+	}, nil
+}
+
 func newFormRequestParamInfo(tag *tagx.RunnerFieldInfo) (*FormRequestParamInfo, error) {
 
 	widgetIns, err := widget.NewWidget(tag, response.RenderTypeForm)
@@ -73,37 +151,37 @@ func newFormRequestParamInfo(tag *tagx.RunnerFieldInfo) (*FormRequestParamInfo, 
 	return param, nil
 }
 
-func NewFormRequestParams(el interface{}, renderType string) (*FormRequestParams, error) {
-	renderType = stringsx.DefaultString(renderType, response.RenderTypeForm)
-	typeOf := reflect.TypeOf(el)
-	if typeOf.Kind() == reflect.Pointer {
-		typeOf = typeOf.Elem()
-	}
-	if typeOf.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("输入参数仅支持Struct类型")
-	}
-	reqFields, err := tagx.ParseStructFieldsTypeOf(typeOf, "runner")
-	if err != nil {
-		return nil, err
-	}
-
-	var searchCond []string
-	//	判断不同数据类型form,table,echarts,bi,3D ....
-	children := make([]*FormRequestParamInfo, 0, len(reqFields))
-	for _, field := range reqFields {
-		if field.IsSearchCond() {
-			searchCond = append(searchCond, field.GetCode())
-			continue
-		}
-		info, err := newFormRequestParamInfo(field)
-		if err != nil {
-			return nil, err
-		}
-		children = append(children, info)
-	}
-
-	return &FormRequestParams{
-		SearchCondList: strings.Join(searchCond, ","),
-		RenderType:     renderType,
-		Children:       children}, nil
-}
+//func NewFormRequestParams(el interface{}, renderType string) (*FormRequestParams, error) {
+//	renderType = stringsx.DefaultString(renderType, response.RenderTypeForm)
+//	typeOf := reflect.TypeOf(el)
+//	if typeOf.Kind() == reflect.Pointer {
+//		typeOf = typeOf.Elem()
+//	}
+//	if typeOf.Kind() != reflect.Struct {
+//		return nil, fmt.Errorf("输入参数仅支持Struct类型")
+//	}
+//	reqFields, err := tagx.ParseStructFieldsTypeOf(typeOf, "runner")
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	var searchCond []string
+//	//	判断不同数据类型form,table,echarts,bi,3D ....
+//	children := make([]*FormRequestParamInfo, 0, len(reqFields))
+//	for _, field := range reqFields {
+//		if field.IsSearchCond() {
+//			searchCond = append(searchCond, field.GetCode())
+//			continue
+//		}
+//		info, err := newFormRequestParamInfo(field)
+//		if err != nil {
+//			return nil, err
+//		}
+//		children = append(children, info)
+//	}
+//
+//	return &FormRequestParams{
+//		SearchCondList: strings.Join(searchCond, ","),
+//		RenderType:     renderType,
+//		Children:       children}, nil
+//}

@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/yunhanshu-net/pkg/trace"
+
 	"github.com/spf13/cobra"
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
@@ -34,7 +36,7 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 	}
 
 	ticker := time.NewTicker(time.Second * 1)
-	logger.InfoContextf(ctx, "listen uuid:%s\n", r.uuid)
+	logger.Infof(ctx, "listen uuid:%s\n", r.uuid)
 	defer func() {
 		ticker.Stop()
 		// 使用统一的Shutdown函数而不是单独关闭资源
@@ -44,14 +46,14 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 	for {
 		select {
 		case <-r.down:
-			logger.InfoContextf(ctx, "%s runcher发起关闭请求，关闭连接", r.uuid)
+			logger.Infof(ctx, "%s runcher发起关闭请求，关闭连接", r.uuid)
 			return
 		case <-ticker.C:
 			if r.idle > 0 {
 				ts := time.Now().Unix()
 				d := ts - r.lastHandelTs.Unix()
 				if (ts - r.lastHandelTs.Unix()) > r.idle { //超过指定空闲时间的话需要释放进程
-					logger.InfoContextf(ctx, " %v没有处理消息，runner 自动关闭连接 idle config：%v", d, r.idle)
+					logger.Infof(ctx, " %v没有处理消息，runner 自动关闭连接 idle config：%v", d, r.idle)
 					return
 				}
 			}
@@ -81,6 +83,7 @@ func runCmd(cmd *cobra.Command, args []string) {
 	}
 
 	ctx := context.WithValue(context.Background(), constants.TraceID, traceID)
+	ctx = context.WithValue(ctx, trace.FunctionMsgKey, createFunctionMsg(traceID))
 	var req request.RunFunctionReq
 	err = jsonx.UnmarshalFromFile(file, &req)
 	if err != nil {

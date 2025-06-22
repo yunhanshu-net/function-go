@@ -45,8 +45,9 @@ func (r *Runner) runFunction(ctx context.Context, req *request.RunFunctionReq) (
 		var mStart runtime.MemStats
 		var mEnd runtime.MemStats
 		runtime.ReadMemStats(&mStart)
-		ctx1 := &Context{Context: ctx, user: r.detail.User, name: r.detail.Name, version: r.detail.Version}
-		_, rsp, callErr := router.call(ctx1, req.Body)
+		newContext := NewContext(ctx, r.detail.User, r.detail.Name, r.detail.Version)
+		//ctx1 := &Context{Context: ctx, user: r.detail.User, name: r.detail.Name, version: r.detail.Version}
+		_, rsp, callErr := router.call(newContext, req.Body)
 		runtime.ReadMemStats(&mEnd)
 		if callErr != nil {
 			err = fmt.Errorf("路由调用失败: %w", callErr)

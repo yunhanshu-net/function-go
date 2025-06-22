@@ -2,53 +2,41 @@ package api
 
 import (
 	"fmt"
-	"github.com/yunhanshu-net/function-go/view/widget"
-	"github.com/yunhanshu-net/pkg/x/tagx"
+	"reflect"
 )
 
-type TableResponseParams struct {
-	*widget.TableWidget
-}
-
-func NewTableResponseParams(el interface{}) (*TableResponseParams, error) {
-	fields, err := GetFields(el)
-	if err != nil {
-		return nil, err
+// NewTableResponseParams 创建表格响应参数，返回与Request一致的结构
+func NewTableResponseParams(el interface{}) (*TableConfig, error) {
+	rspType := reflect.TypeOf(el)
+	if rspType.Kind() == reflect.Pointer {
+		rspType = rspType.Elem()
 	}
-	items := &tagx.RunnerFieldInfo{}
-	for _, field := range fields {
+
+	if rspType.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("输出参数仅支持Struct类型")
+	}
+
+	// 查找Items字段
+	var itemsFieldType reflect.Type
+	for i := 0; i < rspType.NumField(); i++ {
+		field := rspType.Field(i)
 		if field.Name == "Items" {
-			items = field
+			itemsFieldType = field.Type
 			break
 		}
 	}
-	if items == nil {
+
+	if itemsFieldType == nil {
 		return nil, fmt.Errorf("not found items field")
 	}
-	fields, err = GetFields(items.Value.Interface())
+
+	// 使用新的FormBuilder构建表格配置
+	builder := NewFormBuilder()
+	tableConfig, err := builder.BuildTableConfig(itemsFieldType)
 	if err != nil {
 		return nil, err
 	}
 
-	//提取items字段
-	table, err := widget.NewTable(fields)
-	if err != nil {
-		return nil, err
-	}
-	mp := make(map[string]interface{})
-	for _, field := range fields {
-		info, err := newFormRequestParamInfo(field)
-		if err != nil {
-			continue
-		}
-		mp[field.GetCode()] = info
-	}
-	for i, column := range table.Columns {
-		v, ok := mp[column.Code]
-		if !ok {
-			continue
-		}
-		table.Columns[i].AddFormConfig = v
-	}
-	return &TableResponseParams{TableWidget: table}, nil
+	// 直接返回TableConfig，与Request保持一致
+	return tableConfig, nil
 }

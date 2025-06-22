@@ -1,7 +1,5 @@
 package widget
 
-import "github.com/yunhanshu-net/pkg/x/tagx"
-
 // FileWidget 文件上传组件
 type FileWidget struct {
 	// 组件类型，固定为file
@@ -35,67 +33,67 @@ type FileWidget struct {
 }
 
 // newFileWidget 创建文件上传组件
-func newFileWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
-	file := &FileWidget{
-		Widget: WidgetFile,
-		Type:   TypeFile,
-	}
-
-	tag := info.Tags
-	if tag["accept"] != "" {
-		file.Accept = tag["accept"]
-	}
-
-	if tag["multiple"] != "" {
-		if tag["multiple"] == "true" {
-			file.Multiple = true
-		}
-	}
-
-	if tag["max_size"] != "" {
-		// 这里可以添加字符串转整数的逻辑，简化处理
-		file.MaxSize = 0
-	}
-
-	if tag["limit"] != "" {
-		// 这里可以添加字符串转整数的逻辑，简化处理
-		file.Limit = 0
-	}
-
-	if tag["placeholder"] != "" {
-		file.Placeholder = tag["placeholder"]
-	}
-
-	if tag["auto_upload"] != "" {
-		if tag["auto_upload"] == "true" {
-			file.AutoUpload = true
-		}
-	}
-
-	if tag["action"] != "" {
-		file.Action = tag["action"]
-	}
-
-	if tag["list_type"] != "" {
-		file.ListType = tag["list_type"]
-	}
-
-	if tag["drag"] != "" {
-		if tag["drag"] == "true" {
-			file.Drag = true
-		}
-	}
-
-	if tag["button_text"] != "" {
-		file.ButtonText = tag["button_text"]
-	}
-
-	if tag["tip"] != "" {
-		file.Tip = tag["tip"]
-	}
-
-	return file, nil
-}
+//func newFileWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
+//	file := &FileWidget{
+//		Widget: WidgetFile,
+//		Type:   TypeFile,
+//	}
+//
+//	tag := info.Tags
+//	if tag["accept"] != "" {
+//		file.Accept = tag["accept"]
+//	}
+//
+//	if tag["multiple"] != "" {
+//		if tag["multiple"] == "true" {
+//			file.Multiple = true
+//		}
+//	}
+//
+//	if tag["max_size"] != "" {
+//		// 这里可以添加字符串转整数的逻辑，简化处理
+//		file.MaxSize = 0
+//	}
+//
+//	if tag["limit"] != "" {
+//		// 这里可以添加字符串转整数的逻辑，简化处理
+//		file.Limit = 0
+//	}
+//
+//	if tag["placeholder"] != "" {
+//		file.Placeholder = tag["placeholder"]
+//	}
+//
+//	if tag["auto_upload"] != "" {
+//		if tag["auto_upload"] == "true" {
+//			file.AutoUpload = true
+//		}
+//	}
+//
+//	if tag["action"] != "" {
+//		file.Action = tag["action"]
+//	}
+//
+//	if tag["list_type"] != "" {
+//		file.ListType = tag["list_type"]
+//	}
+//
+//	if tag["drag"] != "" {
+//		if tag["drag"] == "true" {
+//			file.Drag = true
+//		}
+//	}
+//
+//	if tag["button_text"] != "" {
+//		file.ButtonText = tag["button_text"]
+//	}
+//
+//	if tag["tip"] != "" {
+//		file.Tip = tag["tip"]
+//	}
+//
+//	return file, nil
+//}
 
 func (w *FileWidget) GetValueType() string {
 	return w.Type

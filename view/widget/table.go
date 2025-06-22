@@ -13,27 +13,15 @@ type TableWidget struct {
 	Columns []TableColumn `json:"columns,omitempty"`
 }
 
-// TableColumn 表格列定义
+// TableColumn 表格列定义 - 统一使用FieldInfo结构
 type TableColumn struct {
-	Code          string      `json:"code"`
-	Name          string      `json:"name"`
-	ValueType     string      `json:"value_type"`
-	AddFormConfig interface{} `json:"add_form_config"`
-	//AddFormConfig *api.FormRequestParamInfo `json:"add_form_config"`
-	//// 列标识
-	//Prop string `json:"prop"`
-	//// 列标题
-	//Label string `json:"label"`
-	//// 列宽度
-	//Width string `json:"width,omitempty"`
-	//// 对齐方式：left, center, right
-	//Align string `json:"align,omitempty"`
-	//// 是否固定列：left, right
-	//Fixed string `json:"fixed,omitempty"`
-	//// 是否可排序
-	//Sortable bool `json:"sortable,omitempty"`
-	//// 格式化函数名称
-	//Formatter string `json:"formatter,omitempty"`
+	Code         string      `json:"code"`
+	Name         string      `json:"name"`
+	ValueType    string      `json:"value_type"`
+	WidgetType   string      `json:"widget_type"`   // 组件类型：input/select/switch/datetime等
+	WidgetConfig interface{} `json:"widget_config"` // 组件配置对象
+	// 统一使用FieldInfo结构，而不是AddFormConfig
+	FieldConfig interface{} `json:"field_config"` // 完整的字段配置信息
 }
 
 func (w *TableWidget) GetValueType() string {
@@ -45,18 +33,32 @@ func (w *TableWidget) GetWidgetType() string {
 }
 
 func NewTable(info []*tagx.RunnerFieldInfo) (*TableWidget, error) {
-	Columns := make([]TableColumn, 0)
-	for _, v := range info {
-		Columns = append(Columns, TableColumn{
-			Code:      v.GetCode(),
-			Name:      v.GetName(),
-			ValueType: v.GetValueType(),
-		})
-	}
 	if info == nil {
 		return nil, errors.New("NewTable info ==nil")
 	}
 
-	return &TableWidget{Widget: WidgetTable, Columns: Columns}, nil
+	Columns := make([]TableColumn, 0)
+	for _, v := range info {
+		// 为每个字段创建对应的widget配置
+		widgetConfig, err := NewWidget(v, "table") // 使用"table"渲染类型
+		var widgetType string
+		if err != nil {
+			// 如果创建失败，使用默认的input组件
+			widgetConfig, _ = NewInputWidget(v)
+			widgetType = WidgetInput
+		} else {
+			widgetType = widgetConfig.GetWidgetType()
+		}
 
+		Columns = append(Columns, TableColumn{
+			Code:         v.GetCode(),
+			Name:         v.GetName(),
+			ValueType:    v.GetValueType(),
+			WidgetType:   widgetType,
+			WidgetConfig: widgetConfig,
+			FieldConfig:  v,
+		})
+	}
+
+	return &TableWidget{Widget: WidgetTable, Columns: Columns}, nil
 }
