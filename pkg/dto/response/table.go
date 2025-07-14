@@ -89,23 +89,33 @@ func (t *tableData) AutoPaginated(db *gorm.DB, model interface{}, pageInfo *quer
 	if pageInfo == nil {
 		pageInfo = new(query.PageInfoReq)
 	}
+
+	// 使用query库的公开方法应用搜索条件
+	dbWithConditions, err := query.ApplySearchConditions(db, pageInfo)
+	if err != nil {
+		t.err = fmt.Errorf("AutoPaginated.ApplySearchConditions failed: %v", err)
+		return t
+	}
+
 	// 获取分页大小
 	pageSize := pageInfo.GetLimit()
 	offset := pageInfo.GetOffset()
 
 	// 查询总数
 	var totalCount int64
-	if err := db.Model(model).Count(&totalCount).Error; err != nil {
+	if err := dbWithConditions.Model(model).Count(&totalCount).Error; err != nil {
 		t.err = fmt.Errorf("AutoPaginated.Count :%+v failed to count records: %v", t.val, err)
 		return t
 	}
 
+	// 应用排序
 	if pageInfo.GetSorts() != "" {
-		db.Order(pageInfo.GetSorts())
+		dbWithConditions = dbWithConditions.Order(pageInfo.GetSorts())
 	}
+
 	// 查询当前页数据
-	if err := db.Offset(offset).Limit(pageSize).Find(t.val).Error; err != nil {
-		t.err = fmt.Errorf("AutoPaginated.Find :%+v failed to count records: %v", t.val, err)
+	if err := dbWithConditions.Offset(offset).Limit(pageSize).Find(t.val).Error; err != nil {
+		t.err = fmt.Errorf("AutoPaginated.Find :%+v failed to find records: %v", t.val, err)
 		return t
 	}
 

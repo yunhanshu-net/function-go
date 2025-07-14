@@ -9,21 +9,21 @@ import (
 )
 
 type routerInfo struct {
-	Handel  interface{} `json:"-"`
-	key     string
-	Router  string
-	Method  string
-	ApiInfo *FunctionInfo
+	Handel       interface{} `json:"-"`
+	key          string
+	Router       string
+	Method       string
+	FunctionInfo *FunctionOptions
 }
 
 func (r *routerInfo) CreateTables(ctx *Context) error {
-	if r.ApiInfo == nil {
+	if r.FunctionInfo == nil {
 		return nil
 	}
-	if r.ApiInfo.CreateTables == nil {
+	if r.FunctionInfo.CreateTables == nil {
 		return nil
 	}
-	for _, table := range r.ApiInfo.CreateTables {
+	for _, table := range r.FunctionInfo.CreateTables {
 		err := ctx.MustGetOrInitDB().AutoMigrate(table)
 		if err != nil {
 			logger.Errorf(ctx, "create table %+v  error: %v", table, err)

@@ -9,8 +9,9 @@ import (
 // DateTimeWidget 日期时间组件
 type DateTimeWidget struct {
 	// 格式配置
-	Format string `json:"format"` // 具体格式：date/datetime/time/daterange/datetimerange/month/year/week
+	Kind string `json:"kind"` // 具体格式：date/datetime/time/daterange/datetimerange/month/year/week
 
+	Format string `json:"format"` // 具体格式：yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss
 	// 占位符配置
 	Placeholder      string `json:"placeholder"`       // 占位符文本
 	StartPlaceholder string `json:"start_placeholder"` // 范围选择时开始日期占位符
@@ -35,8 +36,9 @@ type DateTimeWidget struct {
 // newDateTimeWidget 创建日期时间组件
 func newDateTimeWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
 	dateTime := &DateTimeWidget{
-		Format:    "date", // 默认日期格式
-		Separator: "至",    // 默认分隔符
+		Kind:      "date",                // 默认日期格式
+		Format:    "yyyy-MM-dd HH:mm:ss", // 默认格式
+		Separator: "至",                   // 默认分隔符
 	}
 
 	if info.Tags == nil {
@@ -46,21 +48,26 @@ func newDateTimeWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
 	tag := info.Tags
 
 	// 设置格式
-	if format, ok := tag["format"]; ok && format != "" {
+	if kind, ok := tag["kind"]; ok && kind != "" {
 		// 验证格式是否有效
 		validFormats := map[string]bool{
 			"date": true, "datetime": true, "time": true,
 			"daterange": true, "datetimerange": true,
 			"month": true, "year": true, "week": true,
 		}
-		if validFormats[format] {
-			dateTime.Format = format
+		if validFormats[kind] {
+			dateTime.Kind = kind
 		}
 	}
 
 	// 设置占位符
 	if placeholder, ok := tag["placeholder"]; ok && placeholder != "" {
 		dateTime.Placeholder = strings.TrimSpace(placeholder)
+	}
+
+	// 设置format
+	if format, ok := tag["format"]; ok && format != "" {
+		dateTime.Format = strings.TrimSpace(format)
 	}
 
 	if startPlaceholder, ok := tag["start_placeholder"]; ok && startPlaceholder != "" {

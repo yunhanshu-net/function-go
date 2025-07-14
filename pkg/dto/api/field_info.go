@@ -26,6 +26,9 @@ type FieldInfo struct {
 
 	// 验证配置（来自validate标签） - 简化为字符串
 	Validation string `json:"validation"`
+
+	// 搜索配置（来自search标签） - 可为nil表示不支持搜索
+	Search *SearchConfig `json:"search"`
 }
 
 // WidgetConfig Widget配置 - 使用灵活的map结构
@@ -56,6 +59,11 @@ type CallbackConfig struct {
 	Params map[string]string `json:"params"` // 回调参数
 }
 
+// SearchConfig 搜索配置 - 来自search标签
+type SearchConfig struct {
+	Operators []string `json:"operators"` // 支持的操作符：eq, like, in, gte, lte, gt, lt
+}
+
 // FunctionInfo 函数信息 - 用于配置函数级别的回调
 type FunctionInfo struct {
 	// 函数基本信息
@@ -80,9 +88,8 @@ type FunctionCallback struct {
 
 // FormConfig 表单配置
 type FormConfig struct {
-	RenderType       string       `json:"render_type"`       // 渲染类型：form, table
-	Fields           []*FieldInfo `json:"fields"`            // 字段列表
-	SearchConditions []string     `json:"search_conditions"` // 搜索条件字段
+	RenderType string       `json:"render_type"` // 渲染类型：form, table
+	Fields     []*FieldInfo `json:"fields"`      // 字段列表
 }
 
 // TableConfig 表格配置
@@ -114,20 +121,6 @@ func (f *FieldInfo) MarshalJSON() ([]byte, error) {
 	// 直接序列化，不做权限的特殊处理
 	// 权限为nil时会序列化为null，前端将其理解为无权限限制
 	return json.Marshal((*Alias)(f))
-}
-
-// IsSearchField 判断是否为搜索字段
-func (f *FieldInfo) IsSearchField() bool {
-	// 根据字段代码或名称判断
-	code := strings.ToLower(f.Code)
-	name := strings.ToLower(f.Name)
-
-	return strings.Contains(code, "search") ||
-		strings.Contains(code, "query") ||
-		strings.Contains(code, "filter") ||
-		strings.Contains(name, "搜索") ||
-		strings.Contains(name, "查询") ||
-		strings.Contains(name, "筛选")
 }
 
 // IsReadOnly 判断是否为只读字段
@@ -169,4 +162,30 @@ func (f *FieldInfo) GetCallback(event string) *CallbackConfig {
 // IsRequired 判断是否为必填字段
 func (f *FieldInfo) IsRequired() bool {
 	return strings.Contains(f.Validation, "required")
+}
+
+// IsSearchable 判断字段是否支持搜索
+func (f *FieldInfo) IsSearchable() bool {
+	return f.Search != nil && len(f.Search.Operators) > 0
+}
+
+// SupportsSearchOperator 判断字段是否支持指定的搜索操作符
+func (f *FieldInfo) SupportsSearchOperator(operator string) bool {
+	if f.Search == nil {
+		return false
+	}
+	for _, op := range f.Search.Operators {
+		if op == operator {
+			return true
+		}
+	}
+	return false
+}
+
+// GetSearchOperators 获取字段支持的搜索操作符列表
+func (f *FieldInfo) GetSearchOperators() []string {
+	if f.Search == nil {
+		return []string{}
+	}
+	return f.Search.Operators
 }

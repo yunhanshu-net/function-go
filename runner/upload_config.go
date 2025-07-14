@@ -71,11 +71,13 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 
 // createFunctionMsg 创建FunctionMsg
-func createFunctionMsg(traceId string) *trace.FunctionMsg {
+func createFunctionMsg(traceId string, method string, router string) *trace.FunctionMsg {
 	return &trace.FunctionMsg{
 		User:         env.User,
 		Runner:       env.Name,
 		Version:      env.Version,
+		Method:       method,
+		Router:       router,
 		TraceID:      traceId,
 		UploadConfig: getUploadConfig(),
 	}

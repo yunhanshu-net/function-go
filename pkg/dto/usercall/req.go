@@ -3,6 +3,7 @@ package usercall
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
 
@@ -60,8 +61,8 @@ type OnInputFuzzyReq struct {
 }
 
 type OnInputValidateReq struct {
-	Code  string `json:"code"`
-	Value string `json:"value"`
+	Code  string      `json:"code"`
+	Value interface{} `json:"value"`
 }
 
 type OnTableDeleteRowsReq struct {
@@ -122,7 +123,7 @@ type OnInputFuzzyResp struct {
 }
 
 type OnInputValidateResp struct {
-	Msg string `json:"msg"`
+	ErrorMsg string `json:"error_msg"`
 }
 
 type OnTableDeleteRowsResp struct {
@@ -132,4 +133,33 @@ type OnTableUpdateRowsResp struct {
 }
 
 type OnTableSearchResp struct {
+}
+
+// DryRunCase 抽象接口 - 所有危险操作都应该实现此接口
+type DryRunCase interface {
+	// Type 返回操作类型
+	Type() string
+
+	// Map 返回操作详情
+	Map() map[string]interface{}
+
+	// Metadata 返回元数据
+	Metadata() map[string]interface{}
+}
+
+// OnDryRunReq DryRun 请求结构体
+type OnDryRunReq struct {
+	Body interface{} `json:"body"` // 原始请求体
+}
+
+// DecodeBody 解码请求体到指定类型
+func (r *OnDryRunReq) DecodeBody(el interface{}) error {
+	return jsonx.Convert(r.Body, el)
+}
+
+// OnDryRunResp DryRun 响应结构体
+type OnDryRunResp struct {
+	Valid   bool         `json:"valid"`   // 是否有效
+	Cases   []DryRunCase `json:"cases"`   // DryRun 案例列表
+	Message string       `json:"message"` // 提示信息
 }

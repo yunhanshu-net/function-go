@@ -3,8 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"github.com/yunhanshu-net/pkg/logger"
 	"strings"
+
+	"github.com/yunhanshu-net/pkg/logger"
 
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/view/widget"
@@ -34,8 +35,6 @@ type FormRequestParamInfo struct {
 }
 
 type FormRequestParams struct {
-	SearchCondList string `json:"search_cond_list"` //支持的查询条件
-	//SearchCondBlickList map[string]string   `json:"search_cond_blick_list"` //禁止的查询条件
 	RenderType string                  `json:"render_type"`
 	Children   []*FormRequestParamInfo `json:"children"`
 }
@@ -116,13 +115,9 @@ func NewFormRequestParams(el interface{}, renderType string) (*FormRequestParams
 		children = append(children, field.ToFormRequestParamInfo())
 	}
 
-	// 处理搜索条件
-	searchCondList := strings.Join(unifiedResponse.SearchConditions, ",")
-
 	return &FormRequestParams{
-		SearchCondList: searchCondList,
-		RenderType:     unifiedResponse.RenderType,
-		Children:       children,
+		RenderType: unifiedResponse.RenderType,
+		Children:   children,
 	}, nil
 }
 

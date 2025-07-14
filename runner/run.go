@@ -83,7 +83,8 @@ func runCmd(cmd *cobra.Command, args []string) {
 	}
 
 	ctx := context.WithValue(context.Background(), constants.TraceID, traceID)
-	ctx = context.WithValue(ctx, trace.FunctionMsgKey, createFunctionMsg(traceID))
+	ctx = context.WithValue(ctx, "trace_id", traceID)
+	ctx = context.WithValue(ctx, trace.FunctionMsgKey, createFunctionMsg(traceID, "", ""))
 	var req request.RunFunctionReq
 	err = jsonx.UnmarshalFromFile(file, &req)
 	if err != nil {

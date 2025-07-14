@@ -8,6 +8,7 @@ var (
 		ValueBoolean,
 		ValueArray,
 		ValueStrings,
+		ValueNumbers,
 		ValueObject,
 		ValueTime,
 		ValueFiles,
@@ -34,6 +35,8 @@ const (
 	// ValueArray 数组类型
 	ValueArray   = "array"
 	ValueStrings = "[]string"
+	ValueNumbers = "[]number"
+	ValueFloats  = "[]float"
 	// ValueObject 对象类型
 	ValueObject = "object"
 	// ValueTime 时间类型

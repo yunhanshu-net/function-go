@@ -11,13 +11,22 @@ import (
 
 // FormBuilder 表单构建器
 type FormBuilder struct {
-	parser *tagx.MultiTagParser
+	parser       *tagx.MultiTagParser
+	functionInfo FunctionInfoInterface // 添加FunctionInfo支持
 }
 
 // NewFormBuilder 创建表单构建器
 func NewFormBuilder() *FormBuilder {
 	return &FormBuilder{
 		parser: tagx.NewMultiTagParser(),
+	}
+}
+
+// NewFormBuilderWithFunctionInfo 创建支持FunctionInfo的表单构建器
+func NewFormBuilderWithFunctionInfo(functionInfo FunctionInfoInterface) *FormBuilder {
+	return &FormBuilder{
+		parser:       tagx.NewMultiTagParser(),
+		functionInfo: functionInfo,
 	}
 }
 
@@ -39,24 +48,16 @@ func (b *FormBuilder) BuildFormConfig(structType reflect.Type, renderType string
 	}
 
 	var formFields []*FieldInfo
-	var searchConditions []string
 
 	for _, field := range fields {
-		// 判断是否为搜索条件
-		if field.IsSearchCondition() {
-			searchConditions = append(searchConditions, field.GetCode())
-			continue
-		}
-
 		// 构建字段信息
 		fieldInfo := b.buildFieldInfo(field, renderType)
 		formFields = append(formFields, fieldInfo)
 	}
 
 	return &FormConfig{
-		RenderType:       renderType,
-		Fields:           formFields,
-		SearchConditions: searchConditions,
+		RenderType: renderType,
+		Fields:     formFields,
 	}, nil
 }
 
@@ -88,11 +89,6 @@ func (b *FormBuilder) BuildTableConfig(structType reflect.Type) (*TableConfig, e
 
 	var columns []*FieldInfo
 	for _, field := range fields {
-		// 表格不需要搜索条件字段
-		if field.IsSearchCondition() {
-			continue
-		}
-
 		fieldInfo := b.buildFieldInfo(field, response.RenderTypeTable)
 		columns = append(columns, fieldInfo)
 	}
@@ -123,6 +119,9 @@ func (b *FormBuilder) buildFieldInfo(field *tagx.FieldConfig, renderType string)
 
 	// 设置验证配置
 	fieldInfo.Validation = field.Validation
+
+	// 设置搜索配置
+	fieldInfo.Search = b.buildSearchConfig(field)
 
 	return fieldInfo
 }
@@ -193,6 +192,7 @@ func (b *FormBuilder) buildPermissionConfig(field *tagx.FieldConfig, renderType 
 func (b *FormBuilder) buildCallbackConfigs(field *tagx.FieldConfig) []CallbackConfig {
 	var configs []CallbackConfig
 
+	// 首先添加标签中定义的回调
 	for _, callback := range field.Callbacks {
 		configs = append(configs, CallbackConfig{
 			Event:  callback.Event,
@@ -200,5 +200,68 @@ func (b *FormBuilder) buildCallbackConfigs(field *tagx.FieldConfig) []CallbackCo
 		})
 	}
 
+	// 如果有FunctionInfo，自动注入字段级回调
+	if b.functionInfo != nil {
+		fieldCode := field.GetCode()
+
+		// 检查OnInputFuzzyMap中是否有该字段的回调
+		if fuzzyMap := b.functionInfo.GetOnInputFuzzyMap(); fuzzyMap != nil {
+			if _, exists := fuzzyMap[fieldCode]; exists {
+				// 检查是否已经有OnInputFuzzy回调，避免重复
+				hasOnInputFuzzy := false
+				for _, existing := range configs {
+					if existing.Event == "OnInputFuzzy" {
+						hasOnInputFuzzy = true
+						break
+					}
+				}
+
+				if !hasOnInputFuzzy {
+					configs = append(configs, CallbackConfig{
+						Event: "OnInputFuzzy",
+						Params: map[string]string{
+							"delay": "300", // 默认延迟300ms
+							"min":   "2",   // 默认最少2个字符
+						},
+					})
+				}
+			}
+		}
+
+		// 检查OnInputValidateMap中是否有该字段的回调
+		if validateMap := b.functionInfo.GetOnInputValidateMap(); validateMap != nil {
+			if _, exists := validateMap[fieldCode]; exists {
+				// 检查是否已经有OnInputValidate回调，避免重复
+				hasOnInputValidate := false
+				for _, existing := range configs {
+					if existing.Event == "OnInputValidate" {
+						hasOnInputValidate = true
+						break
+					}
+				}
+
+				if !hasOnInputValidate {
+					configs = append(configs, CallbackConfig{
+						Event: "OnInputValidate",
+						Params: map[string]string{
+							"trigger": "blur", // 默认失焦时触发
+						},
+					})
+				}
+			}
+		}
+	}
+
 	return configs
+}
+
+// buildSearchConfig 构建搜索配置
+func (b *FormBuilder) buildSearchConfig(field *tagx.FieldConfig) *SearchConfig {
+	if field.Search == nil {
+		return nil
+	}
+
+	return &SearchConfig{
+		Operators: field.Search.Operators,
+	}
 }

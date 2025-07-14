@@ -4,11 +4,9 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"github.com/yunhanshu-net/function-go/env"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	"github.com/yunhanshu-net/pkg/constants"
-	"github.com/yunhanshu-net/pkg/trace"
 	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
 
@@ -61,8 +59,8 @@ func (r *Runner) userCallCmd(cmd *cobra.Command, args []string) {
 	//	Context: context.WithValue(context.Background(), constants.TraceID, traceId),
 	//}
 	c := context.WithValue(context.Background(), constants.TraceID, traceId)
-	c = context.WithValue(c, trace.FunctionMsgKey, createFunctionMsg(traceId))
-	ctx := NewContext(c, env.User, env.Name, env.Version)
+	//c = context.WithValue(c, trace.FunctionMsgKey, createFunctionMsg(traceId))
+	ctx := NewContext(c, method, router)
 
 	err = r._callback(ctx, req, resp)
 	if err != nil {

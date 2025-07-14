@@ -18,7 +18,7 @@ type TestProduct struct {
 	ID        int        `json:"id" runner:"code:id;name:产品ID" data:"type:number"`
 	Name      string     `json:"name" runner:"code:name;name:产品名称" widget:"type:input;placeholder:请输入产品名称" data:"type:string" validate:"required"`
 	Price     float64    `json:"price" runner:"code:price;name:产品价格" widget:"type:input;prefix:¥;precision:2" data:"type:float" validate:"required,min=0"`
-	Status    string     `json:"status" runner:"code:status;name:产品状态" widget:"type:switch;true_value:启用;false_value:禁用" data:"type:string;default_value:启用" permission:"read,update"`
+	Status    bool       `json:"status" runner:"code:status;name:产品状态" widget:"type:switch;true_label:启用;false_label:禁用" data:"type:boolean;default_value:true" permission:"read,update"`
 	CreatedAt typex.Time `json:"created_at" runner:"code:created_at;name:创建时间" widget:"type:datetime;format:datetime" data:"type:string;default_value:$now" permission:"read"`
 	UpdatedAt typex.Time `json:"updated_at" runner:"code:updated_at;name:更新时间" widget:"type:datetime;format:datetime" data:"type:string" permission:"read"`
 }
@@ -32,7 +32,7 @@ type TestProductListResp struct {
 type TestProductReq struct {
 	Name       string     `json:"name" form:"name" runner:"code:name;name:产品名称" widget:"type:input;placeholder:请输入产品名称" data:"type:string" validate:"required"`
 	Price      float64    `json:"price" form:"price" runner:"code:price;name:产品价格" widget:"type:input;prefix:¥;precision:2" data:"type:float" validate:"required,min=0"`
-	Status     string     `json:"status" form:"status" runner:"code:status;name:产品状态" widget:"type:switch;true_value:启用;false_value:禁用" data:"type:string;default_value:启用"`
+	Status     bool       `json:"status" form:"status" runner:"code:status;name:产品状态" widget:"type:switch;true_label:启用;false_label:禁用" data:"type:boolean;default_value:true"`
 	LaunchDate typex.Time `json:"launch_date" form:"launch_date" runner:"code:launch_date;name:上线日期" widget:"type:datetime;format:date;min_date:$today" data:"type:string;default_value:$today" validate:"required"`
 }
 
@@ -269,7 +269,7 @@ type Product struct {
 	Price       float64    `json:"price" gorm:"column:price;comment:产品价格" runner:"code:price;name:产品价格" widget:"type:input;prefix:¥;precision:2" data:"type:float" validate:"required,min=0"`
 	Stock       int        `json:"stock" gorm:"column:stock;comment:库存数量" runner:"code:stock;name:库存数量" widget:"type:input;suffix:件" data:"type:number" validate:"required,min=0"`
 	Description string     `json:"description" gorm:"column:description;comment:产品描述" runner:"code:description;name:产品描述" widget:"type:input;mode:text_area;max_length:200" data:"type:string"`
-	Status      string     `json:"status" gorm:"column:status;comment:产品状态" runner:"code:status;name:产品状态" widget:"type:switch;true_value:启用;false_value:禁用;true_label:启用;false_label:禁用" data:"type:string;default_value:启用" validate:"required"`
+	Status      bool       `json:"status" gorm:"column:status;comment:产品状态" runner:"code:status;name:产品状态" widget:"type:switch;true_label:启用;false_label:禁用" data:"type:boolean;default_value:true" validate:"required"`
 	Tags        string     `json:"tags" gorm:"column:tags;comment:产品标签" runner:"code:tags;name:产品标签" widget:"type:tag;separator:,;color:auto;max_tags:5" data:"type:string"`
 	CreatedBy   string     `json:"created_by" gorm:"column:created_by;comment:创建人" runner:"code:created_by;name:创建人" permission:"read"`
 	CreatedAt   typex.Time `json:"created_at" gorm:"autoCreateTime" runner:"code:created_at;name:创建时间" widget:"type:datetime;format:datetime" data:"type:string;example:2025-01-15 10:30:00" permission:"read"`
@@ -513,7 +513,7 @@ type TestComplexIgnoreFields struct {
 	TempData       []byte `runner:"-" validate:"required"`             // 有其他标签但runner忽略
 
 	// 正常字段继续
-	Status    string     `json:"status" runner:"code:status;name:状态" widget:"type:switch" data:"type:string"`
+	Status    bool       `json:"status" runner:"code:status;name:状态" widget:"type:switch;true_label:启用;false_label:禁用" data:"type:boolean;default_value:true"`
 	CreatedAt typex.Time `json:"created_at" runner:"code:created_at;name:创建时间" widget:"type:datetime" data:"type:string" permission:"read"`
 }
 

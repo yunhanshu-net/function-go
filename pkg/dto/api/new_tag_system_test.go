@@ -383,17 +383,41 @@ func TestTableMode(t *testing.T) {
 	fmt.Println("Table模式JSON:")
 	fmt.Println(string(marshal))
 
-	// 验证table模式下permission字段不为null
+	// 验证table模式下权限字段的处理
 	if tableConfig, ok := params.(*TableConfig); ok {
 		fmt.Printf("Table模式解析到 %d 个列\n", len(tableConfig.Columns))
 
 		for _, column := range tableConfig.Columns {
 			if column.Permission == nil {
-				t.Errorf("Table模式下字段 %s 的permission不应该为null", column.Code)
+				fmt.Printf("- 字段 %s: 无权限限制（前端按全部权限处理）\n", column.Code)
 			} else {
 				fmt.Printf("- 字段 %s: read=%v, update=%v, create=%v\n",
 					column.Code, column.Permission.Read, column.Permission.Update, column.Permission.Create)
 			}
+		}
+
+		// 验证具体的权限处理逻辑
+		// 查找有permission标签的字段
+		var readOnlyField *FieldInfo
+		var normalField *FieldInfo
+
+		for _, column := range tableConfig.Columns {
+			if column.Code == "readonly_field" {
+				readOnlyField = column
+			}
+			if column.Code == "normal_field" {
+				normalField = column
+			}
+		}
+
+		// 有permission标签的字段应该有Permission配置
+		if readOnlyField != nil && readOnlyField.Permission == nil {
+			t.Errorf("有permission标签的字段 %s 应该有Permission配置", readOnlyField.Code)
+		}
+
+		// 没有permission标签的字段应该返回null（表示无权限限制）
+		if normalField != nil && normalField.Permission != nil {
+			t.Errorf("没有permission标签的字段 %s 应该返回null，表示无权限限制", normalField.Code)
 		}
 	} else {
 		t.Errorf("期望返回TableConfig，实际返回: %T", params)

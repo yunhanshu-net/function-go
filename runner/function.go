@@ -4,29 +4,29 @@ import (
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 )
 
-func Get[ReqPtr any](router string, handler func(ctx *Context, req ReqPtr, resp response.Response) error, config ...*FunctionInfo) {
+func Get[ReqPtr any](router string, handler func(ctx *Context, req ReqPtr, resp response.Response) error, options ...*FunctionOptions) {
 	initRunner()
-	r.get(router, handler, config...)
+	r.get(router, handler, options...)
 }
 
-func Post[ReqPtr any](router string, handler func(ctx *Context, req ReqPtr, resp response.Response) error, config ...*FunctionInfo) {
+func Post[ReqPtr any](router string, handler func(ctx *Context, req ReqPtr, resp response.Response) error, options ...*FunctionOptions) {
 	initRunner()
-	r.post(router, handler, config...)
+	r.post(router, handler, options...)
 }
 
-func (r *Runner) get(router string, handel interface{}, config ...*FunctionInfo) {
+func (r *Runner) get(router string, handel interface{}, options ...*FunctionOptions) {
 	key := fmtKey(router, "GET")
 	_, ok := r.routerMap[key]
 	if !ok {
 		worker := &routerInfo{
-			key:     key,
-			Handel:  handel,
-			Method:  "GET",
-			Router:  router,
-			ApiInfo: &FunctionInfo{},
+			key:          key,
+			Handel:       handel,
+			Method:       "GET",
+			Router:       router,
+			FunctionInfo: &FunctionOptions{},
 		}
-		if len(config) > 0 && config[0] != nil {
-			worker.ApiInfo = config[0]
+		if len(options) > 0 && options[0] != nil {
+			worker.FunctionInfo = options[0]
 		}
 
 		r.routerMap[key] = worker
@@ -35,19 +35,19 @@ func (r *Runner) get(router string, handel interface{}, config ...*FunctionInfo)
 	}
 }
 
-func (r *Runner) post(router string, handel interface{}, config ...*FunctionInfo) {
+func (r *Runner) post(router string, handel interface{}, options ...*FunctionOptions) {
 	key := fmtKey(router, "POST")
 	_, ok := r.routerMap[key]
 	if !ok {
 		worker := &routerInfo{
-			key:     key,
-			Handel:  handel,
-			Method:  "POST",
-			Router:  router,
-			ApiInfo: &FunctionInfo{},
+			key:          key,
+			Handel:       handel,
+			Method:       "POST",
+			Router:       router,
+			FunctionInfo: &FunctionOptions{},
 		}
-		if len(config) > 0 && config[0] != nil {
-			worker.ApiInfo = config[0]
+		if len(options) > 0 && options[0] != nil {
+			worker.FunctionInfo = options[0]
 		}
 
 		r.routerMap[key] = worker

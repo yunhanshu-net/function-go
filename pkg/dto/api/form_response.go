@@ -28,8 +28,6 @@ type FormResponseParamInfo struct {
 }
 
 type FormResponseParams struct {
-	SearchCondList string `json:"search_cond_list"` //支持的查询条件
-
 	RenderType string                   `json:"render_type"`
 	Children   []*FormResponseParamInfo `json:"children"`
 }
@@ -97,16 +95,9 @@ func NewFormResponseParams(el interface{}) (*FormResponseParams, error) {
 		}
 	}
 
-	var searchCond []string
-	children := make([]*FormResponseParamInfo, 0, len(formConfig.Fields))
+	var children = make([]*FormResponseParamInfo, 0, len(formConfig.Fields))
 
 	for _, fieldInfo := range formConfig.Fields {
-		// 检查是否为搜索条件字段
-		if fieldInfo.IsSearchField() {
-			searchCond = append(searchCond, fieldInfo.Code)
-			continue
-		}
-
 		info, err := newFormResponseParamInfo(fieldInfo)
 		if err != nil {
 			return nil, err
@@ -115,8 +106,7 @@ func NewFormResponseParams(el interface{}) (*FormResponseParams, error) {
 	}
 
 	return &FormResponseParams{
-		SearchCondList: strings.Join(searchCond, ","),
-		RenderType:     response.RenderTypeForm,
-		Children:       children,
+		RenderType: response.RenderTypeForm,
+		Children:   children,
 	}, nil
 }

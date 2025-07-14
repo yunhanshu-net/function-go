@@ -4,6 +4,7 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	consts "github.com/yunhanshu-net/pkg/constants/usercall"
@@ -53,6 +54,9 @@ type OnTableAddRows func(ctx *Context, req *usercall.OnTableAddRowsReq) (*userca
 // OnTableSearch 当返回前端的数据是table类型时候，前端会把数据渲染成表格，这时候表格数据会有搜索的行为，实现这个函数用来搜索数据
 type OnTableSearch func(ctx *Context, req *usercall.OnTableSearchReq) (*usercall.OnTableSearchResp, error)
 
+// OnDryRun DryRun 回调函数，用于预览危险操作
+type OnDryRun func(ctx *Context, req *usercall.OnDryRunReq) (*usercall.OnDryRunResp, error)
+
 func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Response) (err error) {
 	var res usercall.Response
 
@@ -66,12 +70,12 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 		return err
 	}
-	if worker.ApiInfo == nil {
+	if worker.FunctionInfo == nil {
 		err = fmt.Errorf("router config nil")
 		logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 		return err
 	}
-	apiConf := worker.ApiInfo
+	function := worker.FunctionInfo
 
 	switch req.Type {
 	case consts.CallbackTypeOnCreateTables:
@@ -82,13 +86,13 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		}
 	// 页面加载回调
 	case consts.CallbackTypeOnPageLoad:
-		if apiConf.OnPageLoad == nil {
+		if function.OnPageLoad == nil {
 			err = fmt.Errorf("OnPageLoad handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
 		}
 		userResp := &response.RunFunctionResp{}
-		rsp, err := apiConf.OnPageLoad(ctx, userResp)
+		rsp, err := function.OnPageLoad(ctx, userResp)
 		if err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnPageLoad failed: %w", err)
@@ -114,13 +118,13 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 	// API 生命周期回调
 	case consts.UserCallTypeOnApiCreated:
 		var reqData usercall.OnApiCreatedReq
-		if apiConf.OnApiCreated == nil {
+		if function.OnApiCreated == nil {
 			err = fmt.Errorf("OnApiCreatedReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
 		}
 
-		if err := apiConf.OnApiCreated(ctx, &reqData); err != nil {
+		if err := function.OnApiCreated(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnApiCreatedReq failed: %w", err)
 		}
@@ -128,7 +132,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	case consts.CallbackTypeOnApiUpdated:
 		var reqData usercall.OnApiUpdatedReq
-		if apiConf.OnApiUpdated == nil {
+		if function.OnApiUpdated == nil {
 			err = fmt.Errorf("OnApiUpdatedReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -142,7 +146,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		if err := apiConf.OnApiUpdated(ctx, &reqData); err != nil {
+		if err := function.OnApiUpdated(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnApiUpdatedReq failed: %w", err)
 		}
@@ -150,7 +154,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	case consts.CallbackTypeBeforeApiDelete:
 		var reqData usercall.BeforeApiDeleteReq
-		if apiConf.BeforeApiDelete == nil {
+		if function.BeforeApiDelete == nil {
 			err = fmt.Errorf("BeforeApiDeleteReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -164,7 +168,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		if err := apiConf.BeforeApiDelete(ctx, &reqData); err != nil {
+		if err := function.BeforeApiDelete(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("BeforeApiDeleteReq failed: %w", err)
 		}
@@ -172,7 +176,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	case consts.CallbackTypeAfterApiDeleted:
 		var reqData usercall.AfterApiDeletedReq
-		if apiConf.AfterApiDeleted == nil {
+		if function.AfterApiDeleted == nil {
 			err = fmt.Errorf("AfterApiDeletedReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -186,7 +190,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		if err := apiConf.AfterApiDeleted(ctx, &reqData); err != nil {
+		if err := function.AfterApiDeleted(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("AfterApiDeletedReq failed: %w", err)
 		}
@@ -195,7 +199,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 	// Runner 生命周期回调
 	case consts.CallbackTypeBeforeRunnerClose:
 		var reqData usercall.BeforeRunnerCloseReq
-		if apiConf.BeforeRunnerClose == nil {
+		if function.BeforeRunnerClose == nil {
 			err = fmt.Errorf("BeforeRunnerCloseReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -209,7 +213,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		if err := apiConf.BeforeRunnerClose(ctx, &reqData); err != nil {
+		if err := function.BeforeRunnerClose(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("BeforeRunnerCloseReq failed: %w", err)
 		}
@@ -217,7 +221,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	case consts.CallbackTypeAfterRunnerClose:
 		var reqData usercall.AfterRunnerCloseReq
-		if apiConf.AfterRunnerClose == nil {
+		if function.AfterRunnerClose == nil {
 			err = fmt.Errorf("AfterRunnerCloseReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -231,7 +235,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		if err := apiConf.AfterRunnerClose(ctx, &reqData); err != nil {
+		if err := function.AfterRunnerClose(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("AfterRunnerCloseReq failed: %w", err)
 		}
@@ -240,7 +244,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 	// 版本控制回调
 	case consts.CallbackTypeOnVersionChange:
 		var reqData usercall.OnVersionChangeReq
-		if apiConf.OnVersionChange == nil {
+		if function.OnVersionChange == nil {
 			err = fmt.Errorf("OnVersionChangeReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -254,7 +258,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		if err := apiConf.OnVersionChange(ctx, &reqData); err != nil {
+		if err := function.OnVersionChange(ctx, &reqData); err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnVersionChangeReq failed: %w", err)
 		}
@@ -262,8 +266,50 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	// 输入交互回调
 	case consts.CallbackTypeOnInputFuzzy:
+		var reqData usercall.OnInputFuzzyReq
+		if err = req.DecodeData(&reqData); err != nil {
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
+			return fmt.Errorf("OnInputFuzzyReq decode failed: %w", err)
+		}
+		if function.OnInputFuzzyMap == nil {
+			err = fmt.Errorf("OnInputFuzzyReq handler not configured")
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
+			return err
+		}
+		fuzzy := function.OnInputFuzzyMap[reqData.Code]
+		if fuzzy == nil {
+			return fmt.Errorf("OnInputFuzzyReq handler not configured")
+		}
+		fuzzyResp, err := fuzzy(ctx, &reqData)
+		if err != nil {
+			logger.Errorf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
+			return fmt.Errorf("OnInputFuzzyReq failed: %w", err)
+		}
+		logger.Infof(ctx, "回调处理成功 [类型:%s]", req.Type)
+		return resp.Form(fuzzyResp).Build()
 
 	case consts.CallbackTypeOnInputValidate:
+		var reqData usercall.OnInputValidateReq
+		if err = req.DecodeData(&reqData); err != nil {
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
+			return fmt.Errorf("OnInputValidateReq decode failed: %w", err)
+		}
+		if function.OnInputValidateMap == nil {
+			err = fmt.Errorf("OnInputValidateReq handler not configured")
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
+			return err
+		}
+		validate := function.OnInputValidateMap[reqData.Code]
+		if validate == nil {
+			return fmt.Errorf("OnInputValidateReq handler not configured")
+		}
+		validateResp, err := validate(ctx, &reqData)
+		if err != nil {
+			logger.Errorf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
+			return fmt.Errorf("OnInputValidateReq failed: %w", err)
+		}
+		logger.Infof(ctx, "回调处理成功 [类型:%s]", req.Type)
+		return resp.Form(validateResp).Build()
 
 	// 表格操作回调
 	case consts.CallbackTypeOnTableDeleteRows:
@@ -272,13 +318,13 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
 			return fmt.Errorf("OnTableDeleteRowsReq decode failed: %w", err)
 		}
-		if apiConf.AutoCrudTable != nil {
-			err = apiConf.defaultDeleteRows(ctx, &reqData)
+		if function.AutoCrudTable != nil {
+			err = function.defaultDeleteRows(ctx, &reqData)
 			if err != nil {
 				logger.Errorf(ctx, "回调处理失败 [类型:%s]: defaultDeleteRows 解码失败 %v", req.Type, err)
 			}
 		}
-		if apiConf.OnTableDeleteRows == nil {
+		if function.OnTableDeleteRows == nil {
 
 			//err = fmt.Errorf("OnTableDeleteRowsReq handler not configured")
 			//logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
@@ -289,7 +335,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		respData, err := apiConf.OnTableDeleteRows(ctx, &reqData)
+		respData, err := function.OnTableDeleteRows(ctx, &reqData)
 		if err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnTableDeleteRowsReq failed: %w", err)
@@ -307,13 +353,13 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
 			return fmt.Errorf("OnTableUpdateRowReq decode failed: %w", err)
 		}
-		if apiConf.AutoCrudTable != nil {
-			err = apiConf.defaultUpdateRows(ctx, &reqData)
+		if function.AutoCrudTable != nil {
+			err = function.defaultUpdateRows(ctx, &reqData)
 			if err != nil {
 				logger.Errorf(ctx, "回调处理失败 [类型:%s]: defaultDeleteRows 解码失败 %v", req.Type, err)
 			}
 		}
-		if apiConf.OnTableUpdateRows == nil {
+		if function.OnTableUpdateRows == nil {
 			return nil
 		}
 
@@ -321,7 +367,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		respData, err := apiConf.OnTableUpdateRows(ctx, &reqData)
+		respData, err := function.OnTableUpdateRows(ctx, &reqData)
 		if err != nil {
 			logger.Errorf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnTableUpdateRowReq failed: %w", err)
@@ -339,18 +385,18 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
 			return fmt.Errorf("OnTableAddRowsReq decode failed: %w", err)
 		}
-		if apiConf.AutoCrudTable != nil {
-			err = apiConf.defaultAddRows(ctx, &reqData)
+		if function.AutoCrudTable != nil {
+			err = function.defaultAddRows(ctx, &reqData)
 			if err != nil {
 				logger.Errorf(ctx, "回调处理失败 [类型:%s]: OnTableAddRowsReq 解码失败 %v", req.Type, err)
 			}
 		}
-		if apiConf.OnTableAddRows == nil {
+		if function.OnTableAddRows == nil {
 			return nil
 		}
 		// 记录请求详情
 		reqDataJSON, _ := json.Marshal(reqData)
-		respData, err := apiConf.OnTableAddRows(ctx, &reqData)
+		respData, err := function.OnTableAddRows(ctx, &reqData)
 		if err != nil {
 			logger.Errorf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnTableAddRows failed: %w", err)
@@ -362,7 +408,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		return resp.Form(&usercall.OnTableAddRowsResp{}).Build()
 	case consts.CallbackTypeOnTableSearch:
 		var reqData usercall.OnTableSearchReq
-		if apiConf.OnTableSearch == nil {
+		if function.OnTableSearch == nil {
 			err = fmt.Errorf("OnTableSearchReq handler not configured")
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return err
@@ -376,7 +422,7 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		reqDataJSON, _ := json.Marshal(reqData)
 		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
 
-		respData, err := apiConf.OnTableSearch(ctx, &reqData)
+		respData, err := function.OnTableSearch(ctx, &reqData)
 		if err != nil {
 			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
 			return fmt.Errorf("OnTableSearchReq failed: %w", err)
@@ -386,6 +432,35 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		// 记录响应参数
 		respDataJSON, _ := json.Marshal(respData)
 		logger.Infof(ctx, "回调处理成功 [类型:%s] 响应: %s", req.Type, respDataJSON)
+
+	// DryRun 回调
+	case consts.CallbackTypeOnDryRun:
+		var reqData usercall.OnDryRunReq
+		if function.OnDryRun == nil {
+			err = fmt.Errorf("OnDryRun handler not configured")
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
+			return err
+		}
+		if err := req.DecodeData(&reqData); err != nil {
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
+			return fmt.Errorf("OnDryRunReq decode failed: %w", err)
+		}
+
+		// 记录请求详情
+		reqDataJSON, _ := json.Marshal(reqData)
+		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
+
+		respData, err := function.OnDryRun(ctx, &reqData)
+		if err != nil {
+			logger.Errorf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)
+			return fmt.Errorf("OnDryRun failed: %w", err)
+		}
+		res.Response = respData
+
+		// 记录响应参数
+		respDataJSON, _ := json.Marshal(respData)
+		logger.Infof(ctx, "回调处理成功 [类型:%s] 响应: %s", req.Type, respDataJSON)
+		return resp.Form(respData).Build()
 
 	default:
 		err = fmt.Errorf("unsupported callback type: %s", req.Type)

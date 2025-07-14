@@ -4,6 +4,8 @@ package widget
 const (
 	// WidgetInput 文本输入框
 	WidgetInput = "input"
+	// WidgetNumber 数字输入框
+	WidgetNumber = "number"
 	// WidgetCheckbox 多选框
 	WidgetCheckbox = "checkbox"
 	// WidgetRadio 单选框

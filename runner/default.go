@@ -2,12 +2,13 @@ package runner
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yunhanshu-net/function-go/pkg/dto/api"
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	constants "github.com/yunhanshu-net/pkg/constants/usercall"
 	"gorm.io/gorm/schema"
-	"strings"
 )
 
 func (r *Runner) registerBuiltInRouters() {
@@ -38,7 +39,7 @@ func ping(ctx *Context, req *request.NoData, resp response.Response) error {
 
 // buildApiInfo 从路由信息构建API信息
 func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
-	config := worker.ApiInfo
+	config := worker.FunctionInfo
 	if config == nil {
 		return nil, fmt.Errorf("路由配置为空")
 	}
@@ -61,8 +62,8 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 	}
 
 	if config.Request != nil {
-		// 获取请求参数信息
-		params, err := api.NewRequestParams(config.Request, config.RenderType)
+		// 获取请求参数信息 - 使用支持FunctionInfo的版本
+		params, err := api.NewRequestParamsWithFunctionInfo(config.Request, config.RenderType, config)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +168,7 @@ func (r *Runner) _getApiInfo(ctx *Context, req *request.ApiInfoRequest, resp res
 	return resp.Form(apiInfo).Build()
 }
 
-func getCallbacks(config *FunctionInfo) []string {
+func getCallbacks(config *FunctionOptions) []string {
 	var callbacks []string
 	if config == nil {
 		return nil
@@ -222,6 +223,11 @@ func getCallbacks(config *FunctionInfo) []string {
 
 	if config.OnTableSearch != nil {
 		callbacks = append(callbacks, constants.CallbackTypeOnTableSearch)
+	}
+
+	// DryRun 回调
+	if config.OnDryRun != nil {
+		callbacks = append(callbacks, constants.CallbackTypeOnDryRun)
 	}
 
 	return callbacks

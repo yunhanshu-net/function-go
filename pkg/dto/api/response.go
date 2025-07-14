@@ -11,10 +11,9 @@ import (
 
 // UnifiedAPIResponse 统一的API响应结构
 type UnifiedAPIResponse struct {
-	RenderType       string       `json:"render_type"`       // 渲染类型：form, table
-	Fields           []*FieldInfo `json:"fields"`            // 字段列表（form模式）
-	Columns          []*FieldInfo `json:"columns"`           // 列配置（table模式）
-	SearchConditions []string     `json:"search_conditions"` // 搜索条件字段
+	RenderType string       `json:"render_type"` // 渲染类型：form, table
+	Fields     []*FieldInfo `json:"fields"`      // 字段列表（form模式）
+	Columns    []*FieldInfo `json:"columns"`     // 列配置（table模式）
 }
 
 // JSONRawMessage 返回JSON原始消息
@@ -37,9 +36,8 @@ func NewUnifiedFormResponse(el interface{}, renderType string) (*UnifiedAPIRespo
 	}
 
 	return &UnifiedAPIResponse{
-		RenderType:       formConfig.RenderType,
-		Fields:           formConfig.Fields,
-		SearchConditions: formConfig.SearchConditions,
+		RenderType: formConfig.RenderType,
+		Fields:     formConfig.Fields,
 	}, nil
 }
 

@@ -1,10 +1,12 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
+
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	"github.com/yunhanshu-net/pkg/logger"
-	"reflect"
 )
 
 type FunctionType string
@@ -25,7 +27,7 @@ const (
 type AutoCrud struct {
 }
 
-type FunctionInfo struct {
+type FunctionOptions struct {
 	Router        string                             `json:"router"`         //api的路由
 	Method        string                             `json:"method"`         //api的method
 	ApiDesc       string                             `json:"api_desc"`       //函数介绍
@@ -68,17 +70,29 @@ type FunctionInfo struct {
 	OnInputFuzzyMap    map[string]OnInputFuzzy    `json:"-"` //key是字段的code，字段级回调
 	OnInputValidateMap map[string]OnInputValidate `json:"-"` //key是字段的code，字段级回调
 
+	OnDryRun OnDryRun `json:"-"` // DryRun 回调，用于预览危险操作
 }
 
-func (f *FunctionInfo) defaultDeleteRows(ctx *Context, req *usercall.OnTableDeleteRowsReq) error {
+func (f *FunctionOptions) defaultDeleteRows(ctx *Context, req *usercall.OnTableDeleteRowsReq) error {
 	return ctx.MustGetOrInitDB().Model(f.AutoCrudTable).Delete("id in ?", req.Ids).Error
 }
 
-func (f *FunctionInfo) defaultUpdateRows(ctx *Context, req *usercall.OnTableUpdateRowsReq) error {
+func (f *FunctionOptions) defaultUpdateRows(ctx *Context, req *usercall.OnTableUpdateRowsReq) error {
+	for k, field := range req.Fields {
+		switch field.(type) {
+		case map[string]interface{}:
+			marshal, err := json.Marshal(field)
+			if err != nil {
+				return err
+			}
+			req.Fields[k] = json.RawMessage(marshal)
+		}
+	}
+
 	return ctx.MustGetOrInitDB().Model(f.AutoCrudTable).Where("id in ?", req.Ids).Updates(req.Fields).Error
 }
 
-func (f *FunctionInfo) defaultAddRows(ctx *Context, req *usercall.OnTableAddRowsReq) error {
+func (f *FunctionOptions) defaultAddRows(ctx *Context, req *usercall.OnTableAddRowsReq) error {
 	//  获取模型的类型
 	modelType := reflect.TypeOf(f.AutoCrudTable)
 	if modelType.Kind() == reflect.Ptr {
@@ -97,6 +111,8 @@ func (f *FunctionInfo) defaultAddRows(ctx *Context, req *usercall.OnTableAddRows
 		return err
 	}
 
+	logger.Infof(ctx, "defaultAddRows slice: %+v", slice.Interface())
+
 	// 检查是否有数据
 	if slice.Len() == 0 {
 		return fmt.Errorf("没有要添加的数据")
@@ -104,4 +120,30 @@ func (f *FunctionInfo) defaultAddRows(ctx *Context, req *usercall.OnTableAddRows
 
 	//  执行数据库插入
 	return ctx.MustGetOrInitDB().Create(slicePtr.Interface()).Error
+}
+
+// GetOnInputFuzzyMap 实现FunctionInfoInterface接口
+func (f *FunctionOptions) GetOnInputFuzzyMap() map[string]interface{} {
+	if f.OnInputFuzzyMap == nil {
+		return nil
+	}
+
+	result := make(map[string]interface{})
+	for key, value := range f.OnInputFuzzyMap {
+		result[key] = value
+	}
+	return result
+}
+
+// GetOnInputValidateMap 实现FunctionInfoInterface接口
+func (f *FunctionOptions) GetOnInputValidateMap() map[string]interface{} {
+	if f.OnInputValidateMap == nil {
+		return nil
+	}
+
+	result := make(map[string]interface{})
+	for key, value := range f.OnInputValidateMap {
+		result[key] = value
+	}
+	return result
 }
