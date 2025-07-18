@@ -17,6 +17,10 @@ const (
 	WidgetSlider = "slider"
 	// WidgetFile 文件上传组件
 	WidgetFile = "file"
+	// WidgetListInput 列表输入组件 - 新增
+	WidgetListInput = "list_input"
+	// WidgetForm 表单组件 - 新增
+	WidgetForm = "form"
 )
 
 // 表格组件类型

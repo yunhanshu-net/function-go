@@ -145,9 +145,66 @@ func (b *FormBuilder) buildWidgetConfig(field *tagx.FieldConfig) WidgetConfig {
 		if config.Config == nil {
 			config.Config = make(map[string]interface{})
 		}
+
+		// 特殊处理：递归解析子字段
+		if config.Type == "list_input" || config.Type == "form" {
+			// 递归解析子字段
+			subFields, err := b.buildSubFields(field)
+			if err == nil && len(subFields) > 0 {
+				// 将子字段添加到Fields字段中
+				config.Fields = subFields
+			}
+		}
 	}
 
 	return config
+}
+
+// buildSubFields 递归构建子字段配置
+func (b *FormBuilder) buildSubFields(field *tagx.FieldConfig) ([]*FieldInfo, error) {
+	var subFields []*FieldInfo
+
+	// 根据字段类型确定要解析的结构体类型
+	var structType reflect.Type
+
+	switch field.FieldType.Kind() {
+	case reflect.Slice:
+		// 对于 []struct 类型，解析切片元素的类型
+		elemType := field.FieldType.Elem()
+		if elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
+		if elemType.Kind() == reflect.Struct {
+			structType = elemType
+		}
+	case reflect.Struct:
+		// 对于 struct 类型，直接使用
+		structType = field.FieldType
+	case reflect.Ptr:
+		// 对于 *struct 类型，解引用
+		if field.FieldType.Elem().Kind() == reflect.Struct {
+			structType = field.FieldType.Elem()
+		}
+	}
+
+	// 如果没有找到有效的结构体类型，返回空列表
+	if structType == nil {
+		return subFields, nil
+	}
+
+	// 解析结构体字段
+	fields, err := b.parser.ParseStruct(structType)
+	if err != nil {
+		return subFields, err
+	}
+
+	// 构建子字段信息
+	for _, subField := range fields {
+		fieldInfo := b.buildFieldInfo(subField, "form") // 子字段默认使用form渲染类型
+		subFields = append(subFields, fieldInfo)
+	}
+
+	return subFields, nil
 }
 
 // buildDataConfig 构建数据配置

@@ -33,8 +33,9 @@ type FieldInfo struct {
 
 // WidgetConfig Widget配置 - 使用灵活的map结构
 type WidgetConfig struct {
-	Type   string                 `json:"type"`   // 组件类型：input, select, switch, checkbox等
-	Config map[string]interface{} `json:"config"` // 组件个性化配置
+	Type   string                 `json:"type"`             // 组件类型：input, select, switch, checkbox等
+	Config map[string]interface{} `json:"config"`           // 组件个性化配置
+	Fields []*FieldInfo           `json:"fields,omitempty"` // 子字段配置（用于list_input和form组件）
 }
 
 // DataConfig 数据配置 - type字段迁移到这里

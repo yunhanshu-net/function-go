@@ -41,6 +41,10 @@ func NewWidget(info *tagx.RunnerFieldInfo, renderType string) (Widget, error) {
 			return newFileUploadWidget(info)
 		case WidgetFileDisplay:
 			return newFileDisplayWidget(info)
+		case WidgetListInput:
+			return newListInputWidget(info)
+		case WidgetForm:
+			return newFormWidget(info)
 		}
 	case response.RenderTypeForm:
 		switch widgetType {
@@ -70,6 +74,10 @@ func NewWidget(info *tagx.RunnerFieldInfo, renderType string) (Widget, error) {
 			return newFileUploadWidget(info)
 		case WidgetFileDisplay:
 			return newFileDisplayWidget(info)
+		case WidgetListInput:
+			return newListInputWidget(info)
+		case WidgetForm:
+			return newFormWidget(info)
 		}
 		return NewInputWidget(info)
 	}

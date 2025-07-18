@@ -28,24 +28,25 @@ type AutoCrud struct {
 }
 
 type FunctionOptions struct {
-	Router        string                             `json:"router"`         //api的路由
-	Method        string                             `json:"method"`         //api的method
-	ApiDesc       string                             `json:"api_desc"`       //函数介绍
-	IsPublicApi   bool                               `json:"is_public_api"`  //是否是公共api，默认false
-	ChineseName   string                             `json:"chinese_name"`   //中文名称
-	EnglishName   string                             `json:"english_name"`   //英文名称，需要符合go的文件名称规范和路由规范
-	Classify      string                             `json:"classify"`       //分类
-	Tags          []string                           `json:"tags"`           //tags
-	Async         bool                               `json:"async"`          //是否异步，比较耗时的api，或者需要后台慢慢处理的api
-	FunctionType  FunctionType                       `json:"function_type"`  //函数类型 默认：dynamic_function
-	Timeout       int                                `json:"timeout"`        //超时时间，单位毫秒,0表示不超时
-	RenderType    string                             `json:"widget"`         // 渲染类型	//form，table，echarts
-	CreateTables  []interface{}                      `json:"create_tables"`  //创建该api时候会自动帮忙创建这个数据库表gorm的model列表
-	UseTables     []interface{}                      `json:"use_tables"`     //这里需要记录这个函数用到的数据表，方便梳理引用关系
-	OperateTables map[interface{}][]OperateTableType `json:"operate_tables"` //用到了哪些表，对表进行了哪些操作方便梳理引用关系
-	AutoRun       bool                               `json:"-"`              //是否自动运行，默认false，如果为true，则在用户访问这个函数时候，会自动运行一次
-	Request       interface{}                        `json:"-"`              //这里是用户request请求的model，需要在相关字段打上runner 标签，runner:"-" 会忽略这个字段
-	Response      interface{}                        `json:"-"`              //这里是用户response的model，需要在相关字段打上runner 标签，runner:"-" 会忽略这个字段
+	AutoUpdateConfig interface{}                        `json:"auto_update_config"` //这里是函数的配置，这里的
+	Router           string                             `json:"router"`             //api的路由
+	Method           string                             `json:"method"`             //api的method
+	ApiDesc          string                             `json:"api_desc"`           //函数介绍
+	IsPublicApi      bool                               `json:"is_public_api"`      //是否是公共api，默认false
+	ChineseName      string                             `json:"chinese_name"`       //中文名称
+	EnglishName      string                             `json:"english_name"`       //英文名称，需要符合go的文件名称规范和路由规范
+	Classify         string                             `json:"classify"`           //分类
+	Tags             []string                           `json:"tags"`               //tags
+	Async            bool                               `json:"async"`              //是否异步，比较耗时的api，或者需要后台慢慢处理的api
+	FunctionType     FunctionType                       `json:"function_type"`      //函数类型 默认：dynamic_function
+	Timeout          int                                `json:"timeout"`            //超时时间，单位毫秒,0表示不超时
+	RenderType       string                             `json:"widget"`             // 渲染类型	//form，table，echarts
+	CreateTables     []interface{}                      `json:"create_tables"`      //创建该api时候会自动帮忙创建这个数据库表gorm的model列表
+	UseTables        []interface{}                      `json:"use_tables"`         //这里需要记录这个函数用到的数据表，方便梳理引用关系
+	OperateTables    map[interface{}][]OperateTableType `json:"operate_tables"`     //用到了哪些表，对表进行了哪些操作方便梳理引用关系
+	AutoRun          bool                               `json:"-"`                  //是否自动运行，默认false，如果为true，则在用户访问这个函数时候，会自动运行一次
+	Request          interface{}                        `json:"-"`                  //这里是用户request请求的model，需要在相关字段打上runner 标签，runner:"-" 会忽略这个字段
+	Response         interface{}                        `json:"-"`                  //这里是用户response的model，需要在相关字段打上runner 标签，runner:"-" 会忽略这个字段
 
 	AutoCrudTable interface{} `json:"-"` //table函数列表接口，这里注册操作的表的model，内部可以自动实现表的更新和删除操作
 	//用map的都是字段级别的回调，其他的都是接口级别回调

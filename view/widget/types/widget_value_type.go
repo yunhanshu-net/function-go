@@ -12,6 +12,8 @@ var (
 		ValueObject,
 		ValueTime,
 		ValueFiles,
+		ValueStruct,
+		ValueListStruct,
 	}
 )
 
@@ -45,6 +47,10 @@ const (
 	ValueFloat = "float"
 	// ValueFiles 文件类型
 	ValueFiles = "files"
+	// ValueStruct 结构体类型
+	ValueStruct = "struct"
+	// ValueListStruct 结构体数组类型
+	ValueListStruct = "[]struct"
 )
 
 // UseValueType 这里需要判断，假如请求字段是go的int类型，但是用户不小心在tag里把类型写成string类型了，这时候，我们不应该应用用户的类型，

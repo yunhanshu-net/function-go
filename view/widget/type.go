@@ -26,6 +26,10 @@ const (
 	WidgetFileUpload = "file_upload"
 	// WidgetFileDisplay 文件展示组件
 	WidgetFileDisplay = "file_display"
+	// WidgetListInput 列表输入组件
+	WidgetListInput = "list_input"
+	// WidgetForm 表单组件
+	WidgetForm = "form"
 )
 
 // 表格组件类型
@@ -80,4 +84,8 @@ const (
 	TypeFloat = "float"
 	// TypeFiles 文件类型（复数形式，表示可能是多个文件）
 	TypeFiles = "files"
+	// TypeStruct 结构体类型
+	TypeStruct = "struct"
+	// TypeListStruct 结构体数组类型
+	TypeListStruct = "[]struct"
 )
