@@ -21,6 +21,12 @@ func New() *Runner {
 		panic(err)
 	}
 
+	// 初始化配置管理器
+	configManager := GetConfigManager()
+	// 设置本地文件存储
+	localStorage := NewLocalFileStorage("./configs")
+	configManager.SetStorage(localStorage)
+
 	return &Runner{
 		idle:      5,
 		detail:    runner,

@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yunhanshu-net/function-go/env"
@@ -19,6 +20,7 @@ type Context struct {
 	version string
 	router  string
 	method  string
+	config  *ConfigManager // 配置管理器
 }
 
 func NewContext(ctx context.Context, method string, router string) *Context {
@@ -157,4 +159,35 @@ func (c *Context) CreateFilesFromPath(localPath string) (*files.Files, error) {
 		return nil, err
 	}
 	return files, nil
+}
+
+// ===== Config 相关方法 =====
+
+// Config 获取配置管理器
+func (c *Context) Config() *ConfigManager {
+	if c.config == nil {
+		c.config = GetConfigManager()
+	}
+	return c.config
+}
+
+// GetConfig 获取当前函数的配置结构体指针
+func (c *Context) GetConfig() interface{} {
+	configKey := c.generateConfigKey()
+	configData := c.Config().GetByKey(c, configKey)
+	if configData == nil {
+		return nil
+	}
+
+	// 从配置管理器获取对应的结构体类型并解析
+	return c.Config().GetConfigStruct(c, configKey)
+}
+
+// generateConfigKey 生成配置键
+func (c *Context) generateConfigKey() string {
+	// 处理路由路径，将 / 替换为 . 以安全地用作配置键
+	safeRouter := strings.ReplaceAll(c.router, "/", ".")
+	// 移除前后的点
+	safeRouter = strings.Trim(safeRouter, ".")
+	return fmt.Sprintf("function.%s.%s", safeRouter, c.method)
 }

@@ -27,8 +27,10 @@ const (
 type AutoCrud struct {
 }
 
+// AutoUpdateConfig 自动更新配置结构体
+
 type FunctionOptions struct {
-	AutoUpdateConfig interface{}                        `json:"auto_update_config"` //这里是函数的配置，这里的
+	AutoUpdateConfig *AutoUpdateConfig                  `json:"auto_update_config"` //这里是函数的配置，这里的
 	Router           string                             `json:"router"`             //api的路由
 	Method           string                             `json:"method"`             //api的method
 	ApiDesc          string                             `json:"api_desc"`           //函数介绍
@@ -59,9 +61,9 @@ type FunctionOptions struct {
 	BeforeApiDelete BeforeApiDelete `json:"-"`
 	AfterApiDeleted AfterApiDeleted `json:"-"`
 
-	BeforeRunnerClose BeforeRunnerClose `json:"-"`
-	AfterRunnerClose  AfterRunnerClose  `json:"-"`
-	OnVersionChange   OnVersionChange   `json:"-"`
+	BeforeRunnerClose BeforeRunnerClose `json:"-"` // 运行器关闭前回调
+	AfterRunnerClose  AfterRunnerClose  `json:"-"` // 运行器关闭后回调
+	OnVersionChange   OnVersionChange   `json:"-"` // 版本变更回调
 
 	OnTableDeleteRows OnTableDeleteRows `json:"-"` //已经实现
 	OnTableUpdateRows OnTableUpdateRows `json:"-"` //已经实现
