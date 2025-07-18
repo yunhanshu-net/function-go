@@ -146,13 +146,20 @@ func (b *FormBuilder) buildWidgetConfig(field *tagx.FieldConfig) WidgetConfig {
 			config.Config = make(map[string]interface{})
 		}
 
-		// 特殊处理：递归解析子字段
+		// 特殊处理：递归解析子字段，并在输出时转换组件类型
 		if config.Type == "list_input" || config.Type == "form" {
 			// 递归解析子字段
 			subFields, err := b.buildSubFields(field)
 			if err == nil && len(subFields) > 0 {
 				// 将子字段添加到Fields字段中
 				config.Fields = subFields
+			}
+			
+			// 在输出时转换组件类型：输入类型 -> 显示类型
+			if config.Type == "list_input" {
+				config.Type = "list_display"
+			} else if config.Type == "form" {
+				config.Type = "form_display"
 			}
 		}
 	}

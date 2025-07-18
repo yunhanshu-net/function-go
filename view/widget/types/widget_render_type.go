@@ -23,6 +23,14 @@ const (
 	WidgetForm = "form"
 )
 
+// 显示组件类型（输出时使用）
+const (
+	// WidgetListDisplay 列表显示组件
+	WidgetListDisplay = "list_display"
+	// WidgetFormDisplay 表单显示组件
+	WidgetFormDisplay = "form_display"
+)
+
 // 表格组件类型
 const (
 	// WidgetTable 表格
