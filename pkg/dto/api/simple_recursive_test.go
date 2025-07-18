@@ -29,7 +29,7 @@ type RecursiveTest struct {
 	Items []SimpleListTest `json:"items" runner:"code:items;name:项目列表" widget:"type:list_input;placeholder:添加项目" data:"type:[]struct"`
 
 	// 嵌套表单组件
-	Config SimpleFormTest `json:"config" runner:"code:config;name:配置" widget:"type:form;title:配置信息" data:"type:struct"`
+	Config SimpleFormTest `json:"config" runner:"code:config;name:配置" widget:"type:form_input;title:配置信息" data:"type:struct"`
 }
 
 // TestSimpleRecursive 测试简单的递归解析
@@ -61,8 +61,8 @@ func TestSimpleRecursive(t *testing.T) {
 			}
 		}
 
-		// 检查form组件的子字段
-		if field.Widget.Type == "form" {
+		// 检查form_input组件的子字段
+		if field.Widget.Type == "form_input" {
 			if fields, ok := field.Widget.Config["fields"]; ok {
 				if subFields, ok := fields.([]*FieldInfo); ok {
 					fmt.Printf("  form子字段数量: %d\n", len(subFields))
@@ -131,8 +131,8 @@ func TestNestedComplex(t *testing.T) {
 					for _, subField := range subFields {
 						fmt.Printf("    - %s (%s): %s\n", subField.Name, subField.Code, subField.Widget.Type)
 						
-						// 检查嵌套的form组件
-						if subField.Widget.Type == "form" {
+								// 检查嵌套的form_input组件
+		if subField.Widget.Type == "form_input" {
 							if subFields2, ok := subField.Widget.Config["fields"]; ok {
 								if subSubFields, ok := subFields2.([]*FieldInfo); ok {
 									fmt.Printf("      嵌套form子字段数量: %d\n", len(subSubFields))

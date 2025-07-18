@@ -27,7 +27,7 @@ type BatchOperation struct {
 	Tags    []string `json:"tags" runner:"code:tags;name:标签" widget:"type:multiselect;options:前端,Vue,React,手机,苹果,新品,开发,重要,紧急;placeholder:选择标签" data:"type:[]string;default_value:[]"`
 
 	// 嵌套表单组件 - 配置
-	Config OperationConfig `json:"config" runner:"code:config;name:配置" widget:"type:form;title:操作配置" data:"type:struct"`
+	Config OperationConfig `json:"config" runner:"code:config;name:配置" widget:"type:form_input;title:操作配置" data:"type:struct"`
 }
 
 // OperationConfig 操作配置结构
@@ -66,7 +66,7 @@ func TestComplexWidgets(t *testing.T) {
 		fmt.Printf("  组件类型: %s\n", field.Widget.Type)
 		
 		// 检查是否有子字段
-		if field.Widget.Type == "list_input" || field.Widget.Type == "form" {
+		if field.Widget.Type == "list_input" || field.Widget.Type == "form_input" {
 			fmt.Printf("  子字段数量: %d\n", len(field.Widget.Config))
 		}
 		fmt.Println()
@@ -127,8 +127,8 @@ func TestRecursiveFieldParsing(t *testing.T) {
 					for _, subField := range subFields {
 						fmt.Printf("    - %s (%s): %s\n", subField.Name, subField.Code, subField.Widget.Type)
 						
-						// 检查嵌套的form组件
-						if subField.Widget.Type == "form" {
+								// 检查嵌套的form_input组件
+		if subField.Widget.Type == "form_input" {
 							if subFields2, ok := subField.Widget.Config["fields"]; ok {
 								if subSubFields, ok := subFields2.([]*FieldInfo); ok {
 									fmt.Printf("      嵌套form子字段数量: %d\n", len(subSubFields))

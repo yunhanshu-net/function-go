@@ -19,8 +19,8 @@ const (
 	WidgetFile = "file"
 	// WidgetListInput 列表输入组件 - 新增
 	WidgetListInput = "list_input"
-	// WidgetForm 表单组件 - 新增
-	WidgetForm = "form"
+	// WidgetFormInput 表单输入组件 - 新增
+WidgetFormInput = "form_input"
 )
 
 // 显示组件类型（输出时使用）

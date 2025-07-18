@@ -43,7 +43,7 @@ func NewWidget(info *tagx.RunnerFieldInfo, renderType string) (Widget, error) {
 			return newFileDisplayWidget(info)
 		case WidgetListInput:
 			return newListInputWidget(info)
-		case WidgetForm:
+		case WidgetFormInput:
 			return newFormWidget(info)
 		}
 	case response.RenderTypeForm:
@@ -76,7 +76,7 @@ func NewWidget(info *tagx.RunnerFieldInfo, renderType string) (Widget, error) {
 			return newFileDisplayWidget(info)
 		case WidgetListInput:
 			return newListInputWidget(info)
-		case WidgetForm:
+		case WidgetFormInput:
 			return newFormWidget(info)
 		}
 		return NewInputWidget(info)

@@ -147,7 +147,7 @@ func (b *FormBuilder) buildWidgetConfig(field *tagx.FieldConfig) WidgetConfig {
 		}
 
 		// 特殊处理：递归解析子字段，并在输出时转换组件类型
-		if config.Type == "list_input" || config.Type == "form" {
+		if config.Type == "list_input" || config.Type == "form_input" {
 			// 递归解析子字段
 			subFields, err := b.buildSubFields(field)
 			if err == nil && len(subFields) > 0 {
@@ -158,7 +158,7 @@ func (b *FormBuilder) buildWidgetConfig(field *tagx.FieldConfig) WidgetConfig {
 			// 在输出时转换组件类型：输入类型 -> 显示类型
 			if config.Type == "list_input" {
 				config.Type = "list_display"
-			} else if config.Type == "form" {
+			} else if config.Type == "form_input" {
 				config.Type = "form_display"
 			}
 		}

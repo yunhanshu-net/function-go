@@ -41,7 +41,7 @@ func (w *FormWidget) GetValueType() string {
 }
 
 func (w *FormWidget) GetWidgetType() string {
-	return WidgetForm
+	return WidgetFormInput
 }
 
 // SetConfig 设置组件配置

@@ -28,8 +28,8 @@ const (
 	WidgetFileDisplay = "file_display"
 	// WidgetListInput 列表输入组件
 	WidgetListInput = "list_input"
-	// WidgetForm 表单组件
-	WidgetForm = "form"
+	// WidgetFormInput 表单输入组件
+WidgetFormInput = "form_input"
 )
 
 // 表格组件类型

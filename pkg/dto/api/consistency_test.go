@@ -36,7 +36,7 @@ type FormStruct struct {
 	Config struct {
 		Title   string `runner:"code:title;name:标题" widget:"type:input" data:"type:string"`
 		Content string `runner:"code:content;name:内容" widget:"type:input" data:"type:string"`
-	} `runner:"code:config;name:配置" widget:"type:form;title:配置信息" data:"type:struct"`
+	} `runner:"code:config;name:配置" widget:"type:form_input;title:配置信息" data:"type:struct"`
 }
 
 // ComplexStruct 复杂嵌套结构测试
@@ -49,7 +49,7 @@ type ComplexStruct struct {
 			Age      int    `runner:"code:age;name:年龄" widget:"type:input" data:"type:number"`
 			Gender   string `runner:"code:gender;name:性别" widget:"type:select;options:男,女,其他" data:"type:string"`
 			Location string `runner:"code:location;name:所在地" widget:"type:input" data:"type:string"`
-		} `runner:"code:profile;name:用户资料" widget:"type:form;title:个人资料" data:"type:struct"`
+		} `runner:"code:profile;name:用户资料" widget:"type:form_input;title:个人资料" data:"type:struct"`
 	} `runner:"code:users;name:用户列表" widget:"type:list_input;placeholder:添加用户" data:"type:[]struct"`
 }
 
