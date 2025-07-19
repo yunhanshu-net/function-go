@@ -7,8 +7,8 @@ import (
 
 // ConfigData 配置数据结构
 type ConfigData struct {
-	Type string `json:"type"` // 配置类型：json, yaml, toml, xml 等
-	Data string `json:"data"` // 配置数据（字符串格式）
+	Type string      `json:"type,omitempty"` // 配置类型：json, yaml, toml, xml 等（可选，默认为json）
+	Data interface{} `json:"data"`           // 配置数据（直接存储，避免双重序列化）
 }
 
 // ConfigUpdateRequest 配置更新请求

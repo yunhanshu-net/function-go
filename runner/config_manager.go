@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/yunhanshu-net/function-go/pkg/dto/syscallback"
 	"github.com/yunhanshu-net/pkg/logger"
 )
@@ -197,22 +198,34 @@ func (cm *ConfigManager) GetConfigStruct(ctx *Context, configKey string) interfa
 
 	if !exists {
 		// 如果没有注册的结构体，返回原始数据
-		return configData
+		return configData.Data
 	}
 
-	// 解析配置数据为结构体
-	switch configData.Type {
-	case "json":
+	// 如果Data已经是结构体类型，直接返回
+	if reflect.TypeOf(configData.Data) == configStructType {
+		return configData.Data
+	}
+
+	// 如果Data是字符串，需要解析
+	if dataStr, ok := configData.Data.(string); ok {
 		// 创建结构体实例
 		instance := reflect.New(configStructType).Interface()
-		if err := json.Unmarshal([]byte(configData.Data), instance); err != nil {
+		if err := json.Unmarshal([]byte(dataStr), instance); err != nil {
 			logger.Warnf(ctx, "解析配置失败: %v", err)
 			return nil
 		}
 		
 		// 返回结构体的值（不是指针）
 		return reflect.ValueOf(instance).Elem().Interface()
-	default:
-		return configData
 	}
+
+	// 如果Data是map或其他类型，尝试直接转换
+	instance := reflect.New(configStructType).Interface()
+	if err := mapstructure.Decode(configData.Data, instance); err != nil {
+		logger.Warnf(ctx, "转换配置失败: %v", err)
+		return nil
+	}
+	
+	// 返回结构体的值（不是指针）
+	return reflect.ValueOf(instance).Elem().Interface()
 }

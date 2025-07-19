@@ -85,20 +85,33 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 		apiInfo.ParamsOut = responseParams
 	}
 
-	logger.Infof(context.Background(), "worker %s config: %v el:%+v ", worker.Router, jsonx.String(config), config)
+	logger.Infof(context.Background(), "worker %s AutoUpdateConfig ==nil:%v config: %v el:%+v ",
+		worker.Router, config.AutoUpdateConfig == nil, jsonx.String(config), config)
+
 	// 处理配置相关
 	if config.AutoUpdateConfig != nil {
 		// 解析配置结构体，生成表单配置
 		configParams, err := api.NewRequestParamsWithFunctionInfo(config.AutoUpdateConfig.ConfigStruct, config.RenderType, config)
 		if err != nil {
+			logger.Errorf(context.Background(), "autoUpdateConfig err: %v %+v", err, config.AutoUpdateConfig)
 			// 记录错误但不中断API构建
 			fmt.Printf("解析配置结构体失败: %v\n", err)
 		} else {
+			logger.Infof(context.Background(), "autoUpdateConfig config params: %+v", configParams)
 			apiInfo.ParamsConfig = configParams
+
+			// 将配置结构体转换为map类型作为初始数据
+			configDataMap, err := structToMap(config.AutoUpdateConfig.ConfigStruct)
+			if err != nil {
+				logger.Errorf(context.Background(), "convert config struct to map failed: %v", err)
+			} else {
+				apiInfo.ParamsData = configDataMap
+			}
 		}
 
 		// 将初始配置写入文件
 		if err := r.writeInitialConfig(worker, config.AutoUpdateConfig.ConfigStruct); err != nil {
+			logger.Errorf(context.Background(), "writeInitialConfig err: %v %+v", err, config.AutoUpdateConfig)
 			// 记录错误但不中断API构建
 			fmt.Printf("写入初始配置失败: %v\n", err)
 		}
@@ -131,6 +144,23 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 	return apiInfo, nil
 }
 
+// structToMap 将结构体转换为map[string]interface{}
+func structToMap(obj interface{}) (map[string]interface{}, error) {
+	// 先序列化为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, fmt.Errorf("序列化结构体失败: %w", err)
+	}
+	
+	// 再反序列化为map
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("反序列化为map失败: %w", err)
+	}
+	
+	return result, nil
+}
+
 // writeInitialConfig 写入初始配置到文件
 func (r *Runner) writeInitialConfig(worker *routerInfo, configStruct interface{}) error {
 	// 生成配置键
@@ -149,16 +179,10 @@ func (r *Runner) writeInitialConfig(worker *routerInfo, configStruct interface{}
 		return nil
 	}
 
-	// 将结构体序列化为JSON
-	configData, err := json.Marshal(configStruct)
-	if err != nil {
-		return fmt.Errorf("序列化配置失败: %w", err)
-	}
-
-	// 创建配置数据
+	// 创建配置数据，直接存储配置对象
 	config := &syscallback.ConfigData{
 		Type: "json",
-		Data: string(configData),
+		Data: configStruct, // 直接存储配置对象，避免双重序列化
 	}
 
 	// 注册配置结构体类型
