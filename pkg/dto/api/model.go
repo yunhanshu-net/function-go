@@ -31,9 +31,14 @@ type Info struct {
 	UseTables []string    `json:"use_tables"`
 	UseDB     []string    `json:"use_db"`
 	Callbacks []string    `json:"callbacks"`
+
+	// 配置相关
+	ParamsConfig interface{} `json:"params_config"` // 配置结构体
+	ParamsData   interface{} `json:"params_data"`   // 配置初始值
 }
 
 type ApiLogs struct {
-	Version string  `json:"version"`
-	Apis    []*Info `json:"apis"`
+	Version string `json:"version"`
+
+	Apis []*Info `json:"apis"`
 }

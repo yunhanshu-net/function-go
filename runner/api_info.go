@@ -45,7 +45,7 @@ type FunctionOptions struct {
 	RenderType       string                             `json:"widget"`             // 渲染类型	//form，table，echarts
 	CreateTables     []interface{}                      `json:"create_tables"`      //创建该api时候会自动帮忙创建这个数据库表gorm的model列表
 	UseTables        []interface{}                      `json:"use_tables"`         //这里需要记录这个函数用到的数据表，方便梳理引用关系
-	OperateTables    map[interface{}][]OperateTableType `json:"operate_tables"`     //用到了哪些表，对表进行了哪些操作方便梳理引用关系
+	OperateTables    map[interface{}][]OperateTableType `json:"-"`                  //用到了哪些表，对表进行了哪些操作方便梳理引用关系
 	AutoRun          bool                               `json:"-"`                  //是否自动运行，默认false，如果为true，则在用户访问这个函数时候，会自动运行一次
 	Request          interface{}                        `json:"-"`                  //这里是用户request请求的model，需要在相关字段打上runner 标签，runner:"-" 会忽略这个字段
 	Response         interface{}                        `json:"-"`                  //这里是用户response的model，需要在相关字段打上runner 标签，runner:"-" 会忽略这个字段

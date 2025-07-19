@@ -1,12 +1,16 @@
 package runner
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yunhanshu-net/function-go/pkg/dto/api"
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/pkg/dto/syscallback"
 	constants "github.com/yunhanshu-net/pkg/constants/usercall"
+	"github.com/yunhanshu-net/pkg/logger"
+	"github.com/yunhanshu-net/pkg/x/jsonx"
 	"gorm.io/gorm/schema"
 	"strings"
 )
@@ -81,6 +85,25 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 		apiInfo.ParamsOut = responseParams
 	}
 
+	logger.Infof(context.Background(), "worker %s config: %v el:%+v ", worker.Router, jsonx.String(config), config)
+	// 处理配置相关
+	if config.AutoUpdateConfig != nil {
+		// 解析配置结构体，生成表单配置
+		configParams, err := api.NewRequestParamsWithFunctionInfo(config.AutoUpdateConfig.ConfigStruct, config.RenderType, config)
+		if err != nil {
+			// 记录错误但不中断API构建
+			fmt.Printf("解析配置结构体失败: %v\n", err)
+		} else {
+			apiInfo.ParamsConfig = configParams
+		}
+
+		// 将初始配置写入文件
+		if err := r.writeInitialConfig(worker, config.AutoUpdateConfig.ConfigStruct); err != nil {
+			// 记录错误但不中断API构建
+			fmt.Printf("写入初始配置失败: %v\n", err)
+		}
+	}
+
 	// 获取数据表信息
 	for _, table := range config.UseTables {
 		if tb, ok := table.(schema.Tabler); ok {
@@ -107,6 +130,55 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 
 	return apiInfo, nil
 }
+
+// writeInitialConfig 写入初始配置到文件
+func (r *Runner) writeInitialConfig(worker *routerInfo, configStruct interface{}) error {
+	// 生成配置键
+	configKey := generateConfigKey(worker.Router, worker.Method)
+
+	// 获取配置管理器
+	configManager := GetConfigManager()
+
+	// 创建正确初始化的上下文
+	ctx := NewContext(context.Background(), worker.Method, worker.Router)
+
+	// 检查配置是否已存在
+	existingConfig := configManager.GetByKey(ctx, configKey)
+	if existingConfig != nil {
+		// 配置已存在，不覆盖
+		return nil
+	}
+
+	// 将结构体序列化为JSON
+	configData, err := json.Marshal(configStruct)
+	if err != nil {
+		return fmt.Errorf("序列化配置失败: %w", err)
+	}
+
+	// 创建配置数据
+	config := &syscallback.ConfigData{
+		Type: "json",
+		Data: string(configData),
+	}
+
+	// 注册配置结构体类型
+	configManager.RegisterConfigStruct(configKey, configStruct)
+
+	// 写入配置
+	return configManager.UpdateConfig(ctx, configKey, config)
+}
+
+// generateConfigKey 生成配置键
+func generateConfigKey(router, method string) string {
+	// 将路由中的路径分隔符替换为点号
+	routerKey := strings.ReplaceAll(strings.Trim(router, "/"), "/", ".")
+	// 去除前后多余的点号
+	routerKey = strings.Trim(routerKey, ".")
+
+	// 生成配置键格式: function.{router}.{method}
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(method))
+}
+
 func (r *routerInfo) IsDefaultRouter() bool {
 	return strings.HasPrefix(strings.TrimPrefix(r.Router, "/"), "_")
 }
@@ -244,7 +316,7 @@ func (r *Runner) _updateConfig(ctx *Context, req *syscallback.ConfigUpdateReques
 			Error:   "router参数不能为空",
 		}).Build()
 	}
-	
+
 	if req.Method == "" {
 		return resp.Form(&syscallback.ConfigUpdateResponse{
 			Success: false,
@@ -282,7 +354,7 @@ func (r *Runner) _getConfig(ctx *Context, req *syscallback.ConfigGetRequest, res
 			Error:   "router参数不能为空",
 		}).Build()
 	}
-	
+
 	if req.Method == "" {
 		return resp.Form(&syscallback.ConfigGetResponse{
 			Success: false,

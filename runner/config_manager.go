@@ -26,7 +26,7 @@ type ConfigStorage interface {
 }
 
 type AutoUpdateConfig struct {
-	ConfigStruct       interface{}          `json:"config_struct"` // 配置结构体指针
+	ConfigStruct       interface{}          `json:"config_struct"` // 配置结构体值（用于类型注册）
 	BeforeConfigChange ConfigChangeCallback `json:"-"`             // 配置变更前回调
 }
 
@@ -39,7 +39,7 @@ type ConfigManager struct {
 	storage       ConfigStorage
 	mutex         sync.RWMutex
 	callbacks     map[string]ConfigChangeCallback // 配置键到回调函数的映射
-	configStructs map[string]interface{}          // 配置键到解析后的结构体指针的映射
+	configStructs map[string]reflect.Type         // 配置键到结构体类型的映射
 }
 
 var (
@@ -53,7 +53,7 @@ func GetConfigManager() *ConfigManager {
 		globalConfigManager = &ConfigManager{
 			cache:         make(map[string]*syscallback.ConfigData),
 			callbacks:     make(map[string]ConfigChangeCallback),
-			configStructs: make(map[string]interface{}),
+			configStructs: make(map[string]reflect.Type),
 		}
 	})
 	return globalConfigManager
@@ -149,9 +149,6 @@ func (cm *ConfigManager) UpdateConfig(ctx *Context, configKey string, newConfig 
 	cm.cache[configKey] = configCopy
 	cm.mutex.Unlock()
 
-	// 同时更新缓存的结构体指针
-	cm.updateCachedStruct(ctx, configKey, configCopy)
-
 	// 同时更新到存储
 	if cm.storage != nil {
 		if err := cm.storage.Write(ctx, configKey, configCopy); err != nil {
@@ -162,34 +159,6 @@ func (cm *ConfigManager) UpdateConfig(ctx *Context, configKey string, newConfig 
 
 	logger.Infof(ctx, "配置 %s 更新成功", configKey)
 	return nil
-}
-
-// updateCachedStruct 更新缓存的结构体指针
-func (cm *ConfigManager) updateCachedStruct(ctx *Context, configKey string, configData *syscallback.ConfigData) {
-	cm.mutex.RLock()
-	cachedStruct, exists := cm.configStructs[configKey]
-	cm.mutex.RUnlock()
-
-	if !exists {
-		return
-	}
-
-	// 检查是否是已解析的结构体指针
-	if reflect.TypeOf(cachedStruct).Kind() != reflect.Ptr {
-		return // 还没有解析过，等待下次获取时解析
-	}
-
-	// 更新结构体指针的值
-	switch configData.Type {
-	case "json":
-		if err := json.Unmarshal([]byte(configData.Data), cachedStruct); err != nil {
-			logger.Warnf(ctx, "更新缓存结构体失败: %v", err)
-			// 解析失败时清除缓存，下次重新解析
-			cm.mutex.Lock()
-			delete(cm.configStructs, configKey)
-			cm.mutex.Unlock()
-		}
-	}
 }
 
 // getBeforeConfigChangeCallback 获取配置变更前回调
@@ -213,25 +182,8 @@ func (cm *ConfigManager) GetCacheSize() int {
 	return len(cm.cache)
 }
 
-// GetConfigStruct 获取配置结构体指针
+// GetConfigStruct 获取配置结构体值
 func (cm *ConfigManager) GetConfigStruct(ctx *Context, configKey string) interface{} {
-	// 先检查是否已有缓存的解析后结构体
-	cm.mutex.RLock()
-	if cachedStruct, exists := cm.configStructs[configKey]; exists {
-		// 检查是否是已解析的结构体指针（不是reflect.Type）
-		if reflect.TypeOf(cachedStruct).Kind() != reflect.Ptr {
-			// 这是类型，需要解析
-			cm.mutex.RUnlock()
-		} else {
-			// 这是已解析的指针，直接返回
-			cm.mutex.RUnlock()
-			return cachedStruct
-		}
-	} else {
-		cm.mutex.RUnlock()
-		return nil
-	}
-
 	// 获取配置数据
 	configData := cm.GetByKey(ctx, configKey)
 	if configData == nil {
@@ -252,18 +204,14 @@ func (cm *ConfigManager) GetConfigStruct(ctx *Context, configKey string) interfa
 	switch configData.Type {
 	case "json":
 		// 创建结构体实例
-		instance := reflect.New(configStructType.(reflect.Type)).Interface()
+		instance := reflect.New(configStructType).Interface()
 		if err := json.Unmarshal([]byte(configData.Data), instance); err != nil {
 			logger.Warnf(ctx, "解析配置失败: %v", err)
 			return nil
 		}
 		
-		// 缓存解析后的结构体指针
-		cm.mutex.Lock()
-		cm.configStructs[configKey] = instance
-		cm.mutex.Unlock()
-		
-		return instance
+		// 返回结构体的值（不是指针）
+		return reflect.ValueOf(instance).Elem().Interface()
 	default:
 		return configData
 	}

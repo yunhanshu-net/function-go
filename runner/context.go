@@ -18,9 +18,9 @@ type Context struct {
 	user    string
 	name    string
 	version string
-	router  string
-	method  string
-	config  *ConfigManager // 配置管理器
+
+	router string
+	method string
 }
 
 func NewContext(ctx context.Context, method string, router string) *Context {
@@ -165,13 +165,10 @@ func (c *Context) CreateFilesFromPath(localPath string) (*files.Files, error) {
 
 // Config 获取配置管理器
 func (c *Context) Config() *ConfigManager {
-	if c.config == nil {
-		c.config = GetConfigManager()
-	}
-	return c.config
+	return GetConfigManager()
 }
 
-// GetConfig 获取当前函数的配置结构体指针
+// GetConfig 获取当前函数的配置结构体值
 func (c *Context) GetConfig() interface{} {
 	configKey := c.generateConfigKey()
 	configData := c.Config().GetByKey(c, configKey)
@@ -190,4 +187,31 @@ func (c *Context) generateConfigKey() string {
 	// 移除前后的点
 	safeRouter = strings.Trim(safeRouter, ".")
 	return fmt.Sprintf("function.%s.%s", safeRouter, c.method)
+}
+
+// ===== 基础信息方法 =====
+
+// User 获取用户信息
+func (c *Context) User() string {
+	return c.user
+}
+
+// Name 获取运行器名称
+func (c *Context) Name() string {
+	return c.name
+}
+
+// Version 获取版本信息
+func (c *Context) Version() string {
+	return c.version
+}
+
+// Router 获取路由信息
+func (c *Context) Router() string {
+	return c.router
+}
+
+// Method 获取HTTP方法
+func (c *Context) Method() string {
+	return c.method
 }
