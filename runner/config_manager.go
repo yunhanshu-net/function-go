@@ -221,9 +221,19 @@ func (cm *ConfigManager) GetConfigStruct(ctx *Context, configKey string) interfa
 
 	// 如果Data是map或其他类型，尝试直接转换
 	instance := reflect.New(configStructType).Interface()
+	
+	// 使用mapstructure进行转换，这是最可靠的方法
 	if err := mapstructure.Decode(configData.Data, instance); err != nil {
 		logger.Warnf(ctx, "转换配置失败: %v", err)
-		return nil
+		// 如果mapstructure失败，尝试JSON序列化再反序列化
+		if dataBytes, err := json.Marshal(configData.Data); err == nil {
+			if err := json.Unmarshal(dataBytes, instance); err != nil {
+				logger.Warnf(ctx, "JSON转换配置失败: %v", err)
+				return nil
+			}
+		} else {
+			return nil
+		}
 	}
 	
 	// 返回结构体的值（不是指针）
