@@ -197,8 +197,7 @@ func generateConfigKey(router, method string) string {
 	routerKey := strings.ReplaceAll(strings.Trim(router, "/"), "/", ".")
 	// 去除前后多余的点号
 	routerKey = strings.Trim(routerKey, ".")
-
-	// 生成配置键格式: function.{router}.{method}
+	// 只对 method 做小写
 	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(method))
 }
 

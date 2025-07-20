@@ -194,6 +194,7 @@ func (c *Context) generateConfigKey() string {
 	safeRouter := strings.ReplaceAll(c.router, "/", ".")
 	// 移除前后的点
 	safeRouter = strings.Trim(safeRouter, ".")
+	// 只对 method 做小写
 	return fmt.Sprintf("function.%s.%s", safeRouter, strings.ToLower(c.method))
 }
 

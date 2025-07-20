@@ -24,7 +24,7 @@ func New() *Runner {
 	// 初始化配置管理器
 	configManager := GetConfigManager()
 	// 设置本地文件存储
-	localStorage := NewLocalFileStorage("./soft/beiluo/v115/workplace/bin/configs")
+	localStorage := NewLocalFileStorage("./configs")
 	configManager.SetStorage(localStorage)
 
 	return &Runner{

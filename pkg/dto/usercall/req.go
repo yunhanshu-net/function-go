@@ -195,8 +195,7 @@ func (req *UpdateConfigReq) GenerateConfigKey() string {
 	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
 	// 去除前后多余的点号
 	routerKey = strings.Trim(routerKey, ".")
-	
-	// 生成配置键格式: function.{router}.{method}
+	// 只对 method 做小写
 	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(req.Method))
 }
 
@@ -212,8 +211,7 @@ func (req *GetConfigReq) GenerateConfigKey() string {
 	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
 	// 去除前后多余的点号
 	routerKey = strings.Trim(routerKey, ".")
-	
-	// 生成配置键格式: function.{router}.{method}
+	// 只对 method 做小写
 	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(req.Method))
 }
 
