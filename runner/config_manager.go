@@ -199,71 +199,101 @@ func (cm *ConfigManager) GetConfigStruct(ctx *Context, configKey string) interfa
 	// 获取配置数据
 	configData := cm.GetByKey(ctx, configKey)
 	if configData == nil {
-		logger.Warnf(ctx, "配置数据为空，configKey: %s", configKey)
+		if logger.GetLogger() != nil {
+			logger.Warnf(ctx, "配置数据为空，configKey: %s", configKey)
+		}
 		return nil
 	}
 
-	logger.Infof(ctx, "GetConfigStruct - configKey: %s, configData.Type: %s, configData.Data类型: %T", configKey, configData.Type, configData.Data)
+	if logger.GetLogger() != nil {
+		logger.Infof(ctx, "GetConfigStruct - configKey: %s, configData.Type: %s, configData.Data类型: %T", configKey, configData.Type, configData.Data)
+	}
 
 	// 从注册的结构体中获取对应的类型
 	cm.mutex.RLock()
 	configStructType, exists := cm.configStructs[configKey]
 	cm.mutex.RUnlock()
 
-	logger.Infof(ctx, "GetConfigStruct - 注册的结构体类型: %v, 是否存在: %v", configStructType, exists)
+	if logger.GetLogger() != nil {
+		logger.Infof(ctx, "GetConfigStruct - 注册的结构体类型: %v, 是否存在: %v", configStructType, exists)
+	}
 
 	if !exists {
 		// 如果没有注册的结构体，返回原始数据
-		logger.Warnf(ctx, "配置结构体未注册，返回原始数据: %T", configData.Data)
+		if logger.GetLogger() != nil {
+			logger.Warnf(ctx, "配置结构体未注册，返回原始数据: %T", configData.Data)
+		}
 		return configData.Data
 	}
 
 	// 如果Data已经是结构体类型，直接返回
 	if reflect.TypeOf(configData.Data) == configStructType {
-		logger.Infof(ctx, "Data已经是正确的结构体类型，直接返回")
+		if logger.GetLogger() != nil {
+			logger.Infof(ctx, "Data已经是正确的结构体类型，直接返回")
+		}
 		return configData.Data
 	}
 
 	// 如果Data是字符串，需要解析
 	if dataStr, ok := configData.Data.(string); ok {
-		logger.Infof(ctx, "Data是字符串，尝试JSON解析")
+		if logger.GetLogger() != nil {
+			logger.Infof(ctx, "Data是字符串，尝试JSON解析")
+		}
 		// 创建结构体实例
 		instance := reflect.New(configStructType).Interface()
 		if err := json.Unmarshal([]byte(dataStr), instance); err != nil {
-			logger.Warnf(ctx, "解析配置失败: %v", err)
+			if logger.GetLogger() != nil {
+				logger.Warnf(ctx, "解析配置失败: %v", err)
+			}
 			return nil
 		}
 		
 		// 返回结构体的值（不是指针）
 		result := reflect.ValueOf(instance).Elem().Interface()
-		logger.Infof(ctx, "JSON解析成功，返回类型: %T", result)
+		if logger.GetLogger() != nil {
+			logger.Infof(ctx, "JSON解析成功，返回类型: %T", result)
+		}
 		return result
 	}
 
 	// 如果Data是map或其他类型，尝试直接转换
-	logger.Infof(ctx, "Data是map类型，尝试mapstructure转换")
+	if logger.GetLogger() != nil {
+		logger.Infof(ctx, "Data是map类型，尝试mapstructure转换")
+	}
 	instance := reflect.New(configStructType).Interface()
 	
 	// 使用mapstructure进行转换，这是最可靠的方法
 	if err := mapstructure.Decode(configData.Data, instance); err != nil {
-		logger.Warnf(ctx, "mapstructure转换配置失败: %v", err)
+		if logger.GetLogger() != nil {
+			logger.Warnf(ctx, "mapstructure转换配置失败: %v", err)
+		}
 		// 如果mapstructure失败，尝试JSON序列化再反序列化
 		if dataBytes, err := json.Marshal(configData.Data); err == nil {
 			if err := json.Unmarshal(dataBytes, instance); err != nil {
-				logger.Warnf(ctx, "JSON转换配置失败: %v", err)
+				if logger.GetLogger() != nil {
+					logger.Warnf(ctx, "JSON转换配置失败: %v", err)
+				}
 				return nil
 			}
-			logger.Infof(ctx, "JSON转换成功")
+			if logger.GetLogger() != nil {
+				logger.Infof(ctx, "JSON转换成功")
+			}
 		} else {
-			logger.Warnf(ctx, "JSON序列化失败: %v", err)
+			if logger.GetLogger() != nil {
+				logger.Warnf(ctx, "JSON序列化失败: %v", err)
+			}
 			return nil
 		}
 	} else {
-		logger.Infof(ctx, "mapstructure转换成功")
+		if logger.GetLogger() != nil {
+			logger.Infof(ctx, "mapstructure转换成功")
+		}
 	}
 	
 	// 返回结构体的值（不是指针）
 	result := reflect.ValueOf(instance).Elem().Interface()
-	logger.Infof(ctx, "最终返回类型: %T", result)
+	if logger.GetLogger() != nil {
+		logger.Infof(ctx, "最终返回类型: %T", result)
+	}
 	return result
 }
