@@ -3,9 +3,19 @@ package usercall
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
+
+// NoData 空数据结构
+type NoData struct{}
+
+// ApiInfoRequest API信息请求
+type ApiInfoRequest struct {
+	Router string `json:"router" form:"router"` // API路由路径
+	Method string `json:"method" form:"method"` // HTTP方法（GET/POST）
+}
 
 type OnPageLoadReq struct {
 }
@@ -162,4 +172,67 @@ type OnDryRunResp struct {
 	Valid   bool         `json:"valid"`   // 是否有效
 	Cases   []DryRunCase `json:"cases"`   // DryRun 案例列表
 	Message string       `json:"message"` // 提示信息
+}
+
+// UpdateConfigReq 配置更新请求
+type UpdateConfigReq struct {
+	Router     string                 `json:"router"`     // 路由路径
+	Method     string                 `json:"method"`     // HTTP方法
+	ConfigData map[string]interface{} `json:"config_data"` // 配置数据
+}
+
+// ToConfigData 转换为ConfigData结构
+func (req *UpdateConfigReq) ToConfigData() *ConfigData {
+	return &ConfigData{
+		Type: "json",
+		Data: req.ConfigData,
+	}
+}
+
+// GenerateConfigKey 生成配置键
+func (req *UpdateConfigReq) GenerateConfigKey() string {
+	// 将路由中的路径分隔符替换为点号
+	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
+	// 去除前后多余的点号
+	routerKey = strings.Trim(routerKey, ".")
+	
+	// 生成配置键格式: function.{router}.{method}
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(req.Method))
+}
+
+// GetConfigReq 配置获取请求
+type GetConfigReq struct {
+	Router string `json:"router"` // 路由路径
+	Method string `json:"method"` // HTTP方法
+}
+
+// GenerateConfigKey 生成配置键
+func (req *GetConfigReq) GenerateConfigKey() string {
+	// 将路由中的路径分隔符替换为点号
+	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
+	// 去除前后多余的点号
+	routerKey = strings.Trim(routerKey, ".")
+	
+	// 生成配置键格式: function.{router}.{method}
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(req.Method))
+}
+
+// UpdateConfigResp 配置更新响应
+type UpdateConfigResp struct {
+	Success bool   `json:"success"` // 是否成功
+	Message string `json:"message"` // 响应消息
+	Error   string `json:"error"`   // 错误信息
+}
+
+// GetConfigResp 配置获取响应
+type GetConfigResp struct {
+	Success bool        `json:"success"` // 是否成功
+	Config  *ConfigData `json:"config"`  // 配置数据
+	Error   string      `json:"error"`   // 错误信息
+}
+
+// ConfigData 配置数据结构
+type ConfigData struct {
+	Type string      `json:"type,omitempty"` // 配置类型：json, yaml, toml, xml 等（可选，默认为json）
+	Data interface{} `json:"data"`           // 配置数据（直接存储，避免双重序列化）
 }

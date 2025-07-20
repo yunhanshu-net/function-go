@@ -462,6 +462,83 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		logger.Infof(ctx, "回调处理成功 [类型:%s] 响应: %s", req.Type, respDataJSON)
 		return resp.Form(respData).Build()
 
+	// 配置管理回调
+	case consts.CallbackTypeOnUpdateConfig:
+		var reqData usercall.UpdateConfigReq
+		if err := req.DecodeData(&reqData); err != nil {
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
+			return fmt.Errorf("UpdateConfigReq decode failed: %w", err)
+		}
+
+		// 验证参数
+		if reqData.Router == "" {
+			return resp.Form(&usercall.UpdateConfigResp{Success: false, Error: "router参数不能为空"}).Build()
+		}
+
+		if reqData.Method == "" {
+			return resp.Form(&usercall.UpdateConfigResp{Success: false, Error: "method参数不能为空"}).Build()
+		}
+
+		// 使用请求对象生成配置键
+		configKey := reqData.GenerateConfigKey()
+
+		// 获取配置管理器
+		configManager := GetConfigManager()
+
+		// 更新配置
+		err := configManager.UpdateConfig(ctx, configKey, reqData.ToConfigData())
+		if err != nil {
+			return resp.Form(&usercall.UpdateConfigResp{
+				Success: false,
+				Error:   err.Error(),
+			}).Build()
+		}
+
+		return resp.Form(&usercall.UpdateConfigResp{
+			Success: true,
+			Message: "配置更新成功",
+		}).Build()
+
+	case consts.CallbackTypeOnGetConfig:
+		var reqData usercall.GetConfigReq
+		if err := req.DecodeData(&reqData); err != nil {
+			logger.Infof(ctx, "回调处理失败 [类型:%s]: 解码失败 %v", req.Type, err)
+			return fmt.Errorf("GetConfigReq decode failed: %w", err)
+		}
+
+		// 验证参数
+		if reqData.Router == "" {
+			return resp.Form(&usercall.GetConfigResp{
+				Success: false,
+				Error:   "router参数不能为空",
+			}).Build()
+		}
+
+		if reqData.Method == "" {
+			return resp.Form(&usercall.GetConfigResp{
+				Success: false,
+				Error:   "method参数不能为空",
+			}).Build()
+		}
+
+		// 使用请求对象生成配置键
+		configKey := reqData.GenerateConfigKey()
+
+		// 获取配置管理器
+		configManager := GetConfigManager()
+		configData := configManager.GetByKey(ctx, configKey)
+		if configData == nil {
+			return resp.Form(&usercall.GetConfigResp{
+				Success: false,
+				Error:   "配置未找到",
+			}).Build()
+		}
+
+		return resp.Form(&usercall.GetConfigResp{
+			Success: true,
+			Config:  configData,
+		}).Build()
+
 	default:
 		err = fmt.Errorf("unsupported callback type: %s", req.Type)
 		logger.Infof(ctx, "回调处理失败 [类型:%s]: 不支持的回调类型", req.Type)

@@ -7,17 +7,17 @@ import (
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/yunhanshu-net/function-go/pkg/dto/syscallback"
+	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	"github.com/yunhanshu-net/pkg/logger"
 )
 
 // ConfigStorage 配置存储接口
 type ConfigStorage interface {
 	// 读取配置
-	Read(ctx *Context, configKey string) (*syscallback.ConfigData, error)
+	Read(ctx *Context, configKey string) (*usercall.ConfigData, error)
 
 	// 写入配置
-	Write(ctx *Context, configKey string, data *syscallback.ConfigData) error
+	Write(ctx *Context, configKey string, data *usercall.ConfigData) error
 
 	// 检查配置是否存在
 	Exists(ctx *Context, configKey string) (bool, error)
@@ -32,11 +32,11 @@ type AutoUpdateConfig struct {
 }
 
 // ConfigChangeCallback 配置变更回调函数类型
-type ConfigChangeCallback func(ctx *Context, oldConfig, newConfig *syscallback.ConfigData) error
+type ConfigChangeCallback func(ctx *Context, oldConfig, newConfig *usercall.ConfigData) error
 
 // ConfigManager 配置管理器
 type ConfigManager struct {
-	cache         map[string]*syscallback.ConfigData
+	cache         map[string]*usercall.ConfigData
 	storage       ConfigStorage
 	mutex         sync.RWMutex
 	callbacks     map[string]ConfigChangeCallback // 配置键到回调函数的映射
@@ -51,11 +51,11 @@ var (
 // GetConfigManager 获取全局配置管理器单例
 func GetConfigManager() *ConfigManager {
 	configManagerOnce.Do(func() {
-		globalConfigManager = &ConfigManager{
-			cache:         make(map[string]*syscallback.ConfigData),
-			callbacks:     make(map[string]ConfigChangeCallback),
-			configStructs: make(map[string]reflect.Type),
-		}
+			globalConfigManager = &ConfigManager{
+		cache:         make(map[string]*usercall.ConfigData),
+		callbacks:     make(map[string]ConfigChangeCallback),
+		configStructs: make(map[string]reflect.Type),
+	}
 	})
 	return globalConfigManager
 }
@@ -81,7 +81,7 @@ func (cm *ConfigManager) RegisterConfigStruct(configKey string, configStruct int
 }
 
 // GetByKey 根据配置键获取配置
-func (cm *ConfigManager) GetByKey(ctx *Context, configKey string) *syscallback.ConfigData {
+func (cm *ConfigManager) GetByKey(ctx *Context, configKey string) *usercall.ConfigData {
 	cm.mutex.RLock()
 	if config, exists := cm.cache[configKey]; exists {
 		cm.mutex.RUnlock()
@@ -94,7 +94,7 @@ func (cm *ConfigManager) GetByKey(ctx *Context, configKey string) *syscallback.C
 }
 
 // loadConfig 从存储加载配置
-func (cm *ConfigManager) loadConfig(ctx *Context, configKey string) *syscallback.ConfigData {
+func (cm *ConfigManager) loadConfig(ctx *Context, configKey string) *usercall.ConfigData {
 	if cm.storage == nil {
 		logger.Warnf(ctx, "配置存储未设置，无法加载配置: %s", configKey)
 		return nil
@@ -107,9 +107,9 @@ func (cm *ConfigManager) loadConfig(ctx *Context, configKey string) *syscallback
 	}
 
 	// 深拷贝配置数据以确保安全
-	var configCopy *syscallback.ConfigData
+	var configCopy *usercall.ConfigData
 	if data != nil {
-		configCopy = &syscallback.ConfigData{
+		configCopy = &usercall.ConfigData{
 			Type: data.Type,
 			Data: data.Data,
 		}
@@ -124,7 +124,7 @@ func (cm *ConfigManager) loadConfig(ctx *Context, configKey string) *syscallback
 }
 
 // UpdateConfig 更新配置
-func (cm *ConfigManager) UpdateConfig(ctx *Context, configKey string, newConfig *syscallback.ConfigData) error {
+func (cm *ConfigManager) UpdateConfig(ctx *Context, configKey string, newConfig *usercall.ConfigData) error {
 	cm.mutex.RLock()
 	oldConfig := cm.cache[configKey]
 	cm.mutex.RUnlock()
@@ -137,9 +137,9 @@ func (cm *ConfigManager) UpdateConfig(ctx *Context, configKey string, newConfig 
 	}
 
 	// 深拷贝配置数据以确保安全
-	var configCopy *syscallback.ConfigData
+	var configCopy *usercall.ConfigData
 	if newConfig != nil {
-		configCopy = &syscallback.ConfigData{
+		configCopy = &usercall.ConfigData{
 			Type: newConfig.Type,
 			Data: newConfig.Data,
 		}
@@ -173,7 +173,7 @@ func (cm *ConfigManager) getBeforeConfigChangeCallback(configKey string) ConfigC
 func (cm *ConfigManager) ClearCache() {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
-	cm.cache = make(map[string]*syscallback.ConfigData)
+	cm.cache = make(map[string]*usercall.ConfigData)
 }
 
 // GetCacheSize 获取缓存大小

@@ -7,7 +7,8 @@ import (
 	"github.com/yunhanshu-net/function-go/pkg/dto/api"
 	"github.com/yunhanshu-net/function-go/pkg/dto/request"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
-	"github.com/yunhanshu-net/function-go/pkg/dto/syscallback"
+	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
+
 	constants "github.com/yunhanshu-net/pkg/constants/usercall"
 	"github.com/yunhanshu-net/pkg/logger"
 	"github.com/yunhanshu-net/pkg/x/jsonx"
@@ -22,8 +23,6 @@ func (r *Runner) registerBuiltInRouters() {
 	r.get("/_getApiInfos", r._getApiInfos)
 	r.get("/_getApiInfo", r._getApiInfo)
 	r.post("/_callback", r._callback)
-	r.post("/_updateConfig", r._updateConfig)
-	r.get("/_getConfig", r._getConfig)
 	//r.post("/_syscall", r._syscall)
 }
 func _env(ctx *Context, req *request.NoData, resp response.Response) error {
@@ -151,13 +150,13 @@ func structToMap(obj interface{}) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("序列化结构体失败: %w", err)
 	}
-	
+
 	// 再反序列化为map
 	var result map[string]interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("反序列化为map失败: %w", err)
 	}
-	
+
 	return result, nil
 }
 
@@ -180,7 +179,7 @@ func (r *Runner) writeInitialConfig(worker *routerInfo, configStruct interface{}
 	}
 
 	// 创建配置数据，直接存储配置对象
-	config := &syscallback.ConfigData{
+	config := &usercall.ConfigData{
 		Type: "json",
 		Data: configStruct, // 直接存储配置对象，避免双重序列化
 	}
@@ -224,7 +223,7 @@ func (r *Runner) getApiInfos() ([]*api.Info, error) {
 	return apis, nil
 }
 
-func (r *Runner) getApiInfo(req *syscallback.ApiInfoRequest) (*api.Info, error) {
+func (r *Runner) getApiInfo(req *usercall.ApiInfoRequest) (*api.Info, error) {
 	// 参数验证
 	if req.Router == "" {
 		return nil, fmt.Errorf("router参数不能为空")
@@ -249,7 +248,7 @@ func (r *Runner) getApiInfo(req *syscallback.ApiInfoRequest) (*api.Info, error) 
 
 }
 
-func (r *Runner) _getApiInfos(ctx *Context, req *syscallback.NoData, resp response.Response) error {
+func (r *Runner) _getApiInfos(ctx *Context, req *usercall.NoData, resp response.Response) error {
 	apis, err := r.getApiInfos()
 	if err != nil {
 		return err
@@ -257,7 +256,7 @@ func (r *Runner) _getApiInfos(ctx *Context, req *syscallback.NoData, resp respon
 	return resp.Form(apis).Build()
 }
 
-func (r *Runner) _getApiInfo(ctx *Context, req *syscallback.ApiInfoRequest, resp response.Response) error {
+func (r *Runner) _getApiInfo(ctx *Context, req *usercall.ApiInfoRequest, resp response.Response) error {
 	apiInfo, err := r.getApiInfo(req)
 	if err != nil {
 		return err
@@ -329,78 +328,4 @@ func getCallbacks(config *FunctionOptions) []string {
 	}
 
 	return callbacks
-}
-
-// _updateConfig 配置更新路由
-func (r *Runner) _updateConfig(ctx *Context, req *syscallback.ConfigUpdateRequest, resp response.Response) error {
-	// 验证参数
-	if req.Router == "" {
-		return resp.Form(&syscallback.ConfigUpdateResponse{
-			Success: false,
-			Error:   "router参数不能为空",
-		}).Build()
-	}
-
-	if req.Method == "" {
-		return resp.Form(&syscallback.ConfigUpdateResponse{
-			Success: false,
-			Error:   "method参数不能为空",
-		}).Build()
-	}
-
-	// 使用请求对象生成配置键
-	configKey := req.GenerateConfigKey()
-
-	// 获取配置管理器
-	configManager := GetConfigManager()
-
-	// 更新配置
-	err := configManager.UpdateConfig(ctx, configKey, req.ConfigData)
-	if err != nil {
-		return resp.Form(&syscallback.ConfigUpdateResponse{
-			Success: false,
-			Error:   err.Error(),
-		}).Build()
-	}
-
-	return resp.Form(&syscallback.ConfigUpdateResponse{
-		Success: true,
-		Message: "配置更新成功",
-	}).Build()
-}
-
-// _getConfig 配置获取路由
-func (r *Runner) _getConfig(ctx *Context, req *syscallback.ConfigGetRequest, resp response.Response) error {
-	// 验证参数
-	if req.Router == "" {
-		return resp.Form(&syscallback.ConfigGetResponse{
-			Success: false,
-			Error:   "router参数不能为空",
-		}).Build()
-	}
-
-	if req.Method == "" {
-		return resp.Form(&syscallback.ConfigGetResponse{
-			Success: false,
-			Error:   "method参数不能为空",
-		}).Build()
-	}
-
-	// 使用请求对象生成配置键
-	configKey := req.GenerateConfigKey()
-
-	// 获取配置管理器
-	configManager := GetConfigManager()
-	configData := configManager.GetByKey(ctx, configKey)
-	if configData == nil {
-		return resp.Form(&syscallback.ConfigGetResponse{
-			Success: false,
-			Error:   "配置未找到",
-		}).Build()
-	}
-
-	return resp.Form(&syscallback.ConfigGetResponse{
-		Success: true,
-		Config:  configData,
-	}).Build()
 }

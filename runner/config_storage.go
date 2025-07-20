@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yunhanshu-net/function-go/pkg/dto/syscallback"
+	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	"github.com/yunhanshu-net/pkg/logger"
 )
 
@@ -41,7 +41,7 @@ func (lfs *LocalFileStorage) getConfigFilePath(configKey string) string {
 }
 
 // Read 读取配置
-func (lfs *LocalFileStorage) Read(ctx *Context, configKey string) (*syscallback.ConfigData, error) {
+func (lfs *LocalFileStorage) Read(ctx *Context, configKey string) (*usercall.ConfigData, error) {
 	filePath := lfs.getConfigFilePath(configKey)
 	
 	data, err := os.ReadFile(filePath)
@@ -54,7 +54,7 @@ func (lfs *LocalFileStorage) Read(ctx *Context, configKey string) (*syscallback.
 	}
 	
 	// 解析配置文件
-	var configData syscallback.ConfigData
+	var configData usercall.ConfigData
 	if err := json.Unmarshal(data, &configData); err != nil {
 		return nil, fmt.Errorf("解析配置文件失败: %w", err)
 	}
@@ -63,7 +63,7 @@ func (lfs *LocalFileStorage) Read(ctx *Context, configKey string) (*syscallback.
 }
 
 // Write 写入配置
-func (lfs *LocalFileStorage) Write(ctx *Context, configKey string, configData *syscallback.ConfigData) error {
+func (lfs *LocalFileStorage) Write(ctx *Context, configKey string, configData *usercall.ConfigData) error {
 	filePath := lfs.getConfigFilePath(configKey)
 	
 	// 确保目录存在
