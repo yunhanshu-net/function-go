@@ -76,8 +76,19 @@ func (cm *ConfigManager) RegisterCallback(configKey string, callback ConfigChang
 func (cm *ConfigManager) RegisterConfigStruct(configKey string, configStruct interface{}) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
+	
+	// 获取结构体类型
+	var structType reflect.Type
+	if reflect.TypeOf(configStruct).Kind() == reflect.Ptr {
+		// 如果是指针，获取指针指向的类型
+		structType = reflect.TypeOf(configStruct).Elem()
+	} else {
+		// 如果不是指针，直接使用类型
+		structType = reflect.TypeOf(configStruct)
+	}
+	
 	// 存储结构体的类型，用于后续创建实例
-	cm.configStructs[configKey] = reflect.TypeOf(configStruct)
+	cm.configStructs[configKey] = structType
 }
 
 // GetByKey 根据配置键获取配置
