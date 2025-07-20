@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"fmt"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/pkg/logger"
@@ -173,16 +172,23 @@ func (r *Runner) registerAutoUpdateConfig(router string, method string, autoConf
 	// 生成配置键，包含method避免不同HTTP方法的冲突
 	configKey := fmt.Sprintf("function.%s.%s", safeRouter, method)
 
+	logger.Infof(nil, "registerAutoUpdateConfig - 路由: %s, 方法: %s, 配置键: %s", router, method, configKey)
+
 	// 获取配置管理器
 	configManager := GetConfigManager()
 
 	// 注册配置变更回调
 	if autoConfig.BeforeConfigChange != nil {
 		configManager.RegisterCallback(configKey, autoConfig.BeforeConfigChange)
+		logger.Infof(nil, "registerAutoUpdateConfig - 已注册配置变更回调")
 	}
 
 	// 注册配置结构体
 	if autoConfig.ConfigStruct != nil {
+		logger.Infof(nil, "registerAutoUpdateConfig - 注册配置结构体，类型: %T", autoConfig.ConfigStruct)
 		configManager.RegisterConfigStruct(configKey, autoConfig.ConfigStruct)
+		logger.Infof(nil, "registerAutoUpdateConfig - 配置结构体注册完成")
+	} else {
+		logger.Warnf(nil, "registerAutoUpdateConfig - ConfigStruct为空")
 	}
 }
