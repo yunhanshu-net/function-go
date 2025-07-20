@@ -186,7 +186,7 @@ func (c *Context) generateConfigKey() string {
 	safeRouter := strings.ReplaceAll(c.router, "/", ".")
 	// 移除前后的点
 	safeRouter = strings.Trim(safeRouter, ".")
-	return fmt.Sprintf("function.%s.%s", safeRouter, c.method)
+	return fmt.Sprintf("function.%s.%s", safeRouter, strings.ToLower(c.method))
 }
 
 // ===== 基础信息方法 =====
