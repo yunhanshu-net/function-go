@@ -3,8 +3,11 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
@@ -89,6 +92,10 @@ func (cm *ConfigManager) RegisterConfigStruct(configKey string, configStruct int
 	
 	// 存储结构体的类型，用于后续创建实例
 	cm.configStructs[configKey] = structType
+	
+	// 添加调试日志
+	writeToFile(fmt.Sprintf("RegisterConfigStruct - 配置键: %s, 结构体类型: %v", configKey, structType))
+	writeToFile(fmt.Sprintf("RegisterConfigStruct - 当前已注册的结构体数量: %d", len(cm.configStructs)))
 }
 
 // GetByKey 根据配置键获取配置
@@ -194,76 +201,108 @@ func (cm *ConfigManager) GetCacheSize() int {
 	return len(cm.cache)
 }
 
+// writeToFile 临时文件日志函数，用于在日志系统未初始化时记录日志
+func writeToFile(message string) {
+	// 确保日志目录存在
+	logDir := "logs"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return
+	}
+
+	// 创建日志文件
+	logFile := filepath.Join(logDir, "config_manager.log")
+	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	// 写入时间戳和消息
+	timestamp := time.Now().Format("2006-01-02 15:04:05.000")
+	logEntry := fmt.Sprintf("[%s] %s\n", timestamp, message)
+	file.WriteString(logEntry)
+}
+
 // GetConfigStruct 获取配置结构体值
 func (cm *ConfigManager) GetConfigStruct(ctx *Context, configKey string) interface{} {
 	// 获取配置数据
 	configData := cm.GetByKey(ctx, configKey)
 	if configData == nil {
-		logger.Warnf(ctx, "配置数据为空，configKey: %s", configKey)
+		writeToFile(fmt.Sprintf("配置数据为空，configKey: %s", configKey))
 		return nil
 	}
 
-	logger.Infof(ctx, "GetConfigStruct - configKey: %s, configData.Type: %s, configData.Data类型: %T", configKey, configData.Type, configData.Data)
+	writeToFile(fmt.Sprintf("GetConfigStruct - configKey: %s, configData.Type: %s, configData.Data类型: %T", configKey, configData.Type, configData.Data))
 
 	// 从注册的结构体中获取对应的类型
 	cm.mutex.RLock()
 	configStructType, exists := cm.configStructs[configKey]
 	cm.mutex.RUnlock()
 
-	logger.Infof(ctx, "GetConfigStruct - 注册的结构体类型: %v, 是否存在: %v", configStructType, exists)
+	writeToFile(fmt.Sprintf("GetConfigStruct - 注册的结构体类型: %v, 是否存在: %v", configStructType, exists))
 
 	if !exists {
 		// 如果没有注册的结构体，返回原始数据
-		logger.Warnf(ctx, "配置结构体未注册，返回原始数据: %T", configData.Data)
+		writeToFile(fmt.Sprintf("配置结构体未注册，返回原始数据: %T", configData.Data))
 		return configData.Data
 	}
 
 	// 如果Data已经是结构体类型，直接返回
 	if reflect.TypeOf(configData.Data) == configStructType {
-		logger.Infof(ctx, "Data已经是正确的结构体类型，直接返回")
+		writeToFile("Data已经是正确的结构体类型，直接返回")
 		return configData.Data
 	}
 
 	// 如果Data是字符串，需要解析
 	if dataStr, ok := configData.Data.(string); ok {
-		logger.Infof(ctx, "Data是字符串，尝试JSON解析")
+		writeToFile("Data是字符串，尝试JSON解析")
 		// 创建结构体实例
 		instance := reflect.New(configStructType).Interface()
 		if err := json.Unmarshal([]byte(dataStr), instance); err != nil {
-			logger.Warnf(ctx, "解析配置失败: %v", err)
+			writeToFile(fmt.Sprintf("解析配置失败: %v", err))
 			return nil
 		}
 		
 		// 返回结构体的值（不是指针）
 		result := reflect.ValueOf(instance).Elem().Interface()
-		logger.Infof(ctx, "JSON解析成功，返回类型: %T", result)
+		writeToFile(fmt.Sprintf("JSON解析成功，返回类型: %T", result))
 		return result
 	}
 
 	// 如果Data是map或其他类型，尝试直接转换
-	logger.Infof(ctx, "Data是map类型，尝试mapstructure转换")
+	writeToFile("Data是map类型，尝试mapstructure转换")
 	instance := reflect.New(configStructType).Interface()
 	
-	// 使用mapstructure进行转换，这是最可靠的方法
-	if err := mapstructure.Decode(configData.Data, instance); err != nil {
-		logger.Warnf(ctx, "mapstructure转换配置失败: %v", err)
+	// 使用mapstructure进行转换，配置使用JSON标签
+	config := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  instance,
+	}
+	decoder, err := mapstructure.NewDecoder(config)
+	if err != nil {
+		writeToFile(fmt.Sprintf("创建mapstructure解码器失败: %v", err))
+		return nil
+	}
+	
+	if err := decoder.Decode(configData.Data); err != nil {
+		writeToFile(fmt.Sprintf("mapstructure转换配置失败: %v", err))
 		// 如果mapstructure失败，尝试JSON序列化再反序列化
 		if dataBytes, err := json.Marshal(configData.Data); err == nil {
 			if err := json.Unmarshal(dataBytes, instance); err != nil {
-				logger.Warnf(ctx, "JSON转换配置失败: %v", err)
+				writeToFile(fmt.Sprintf("JSON转换配置失败: %v", err))
 				return nil
 			}
-			logger.Infof(ctx, "JSON转换成功")
+			writeToFile("JSON转换成功")
 		} else {
-			logger.Warnf(ctx, "JSON序列化失败: %v", err)
+			writeToFile(fmt.Sprintf("JSON序列化失败: %v", err))
 			return nil
 		}
 	} else {
-		logger.Infof(ctx, "mapstructure转换成功")
+		writeToFile("mapstructure转换成功")
 	}
 	
 	// 返回结构体的值（不是指针）
 	result := reflect.ValueOf(instance).Elem().Interface()
-	logger.Infof(ctx, "最终返回类型: %T", result)
+	writeToFile(fmt.Sprintf("最终返回类型: %T", result))
 	return result
 }
