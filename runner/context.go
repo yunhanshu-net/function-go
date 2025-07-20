@@ -11,6 +11,7 @@ import (
 
 	"github.com/yunhanshu-net/pkg/constants"
 	"github.com/yunhanshu-net/pkg/typex/files"
+	"github.com/yunhanshu-net/pkg/logger"
 )
 
 type Context struct {
@@ -171,13 +172,20 @@ func (c *Context) Config() *ConfigManager {
 // GetConfig 获取当前函数的配置结构体值
 func (c *Context) GetConfig() interface{} {
 	configKey := c.generateConfigKey()
+	logger.Infof(c, "GetConfig - 配置键: %s", configKey)
+	
 	configData := c.Config().GetByKey(c, configKey)
 	if configData == nil {
+		logger.Warnf(c, "GetConfig - 配置数据为空")
 		return nil
 	}
 
+	logger.Infof(c, "GetConfig - 配置数据类型: %T", configData.Data)
+
 	// 从配置管理器获取对应的结构体类型并解析
-	return c.Config().GetConfigStruct(c, configKey)
+	result := c.Config().GetConfigStruct(c, configKey)
+	logger.Infof(c, "GetConfig - GetConfigStruct返回类型: %T", result)
+	return result
 }
 
 // generateConfigKey 生成配置键
