@@ -15,7 +15,7 @@ func generateConfigKey(router, method string) string {
 	routerKey = strings.Trim(routerKey, ".")
 
 	// 生成配置键格式: function.{router}.{method}
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(method))
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(method))
 }
 
 func main() {

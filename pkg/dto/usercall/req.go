@@ -195,8 +195,8 @@ func (req *UpdateConfigReq) GenerateConfigKey() string {
 	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
 	// 去除前后多余的点号
 	routerKey = strings.Trim(routerKey, ".")
-	// 只对 method 做小写
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(req.Method))
+	// 使用大写 method
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(req.Method))
 }
 
 // GetConfigReq 配置获取请求
@@ -211,8 +211,8 @@ func (req *GetConfigReq) GenerateConfigKey() string {
 	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
 	// 去除前后多余的点号
 	routerKey = strings.Trim(routerKey, ".")
-	// 只对 method 做小写
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(req.Method))
+	// 使用大写 method
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(req.Method))
 }
 
 // UpdateConfigResp 配置更新响应

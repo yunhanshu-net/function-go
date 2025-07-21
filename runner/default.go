@@ -197,8 +197,8 @@ func generateConfigKey(router, method string) string {
 	routerKey := strings.ReplaceAll(strings.Trim(router, "/"), "/", ".")
 	// 去除前后多余的点号
 	routerKey = strings.Trim(routerKey, ".")
-	// 只对 method 做小写
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToLower(method))
+	// 使用大写 method
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(method))
 }
 
 func (r *routerInfo) IsDefaultRouter() bool {

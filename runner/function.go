@@ -188,8 +188,8 @@ func (r *Runner) registerAutoUpdateConfig(router string, method string, autoConf
 	// 移除前后的点
 	safeRouter = strings.Trim(safeRouter, ".")
 
-	// 生成配置键，只对 method 做小写
-	configKey := fmt.Sprintf("function.%s.%s", safeRouter, strings.ToLower(method))
+	// 生成配置键，使用大写 method
+	configKey := fmt.Sprintf("function.%s.%s", safeRouter, strings.ToUpper(method))
 
 	// 获取配置管理器
 	configManager := GetConfigManager()
