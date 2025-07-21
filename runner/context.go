@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yunhanshu-net/function-go/env"
+	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	"github.com/yunhanshu-net/pkg/trace"
 
 	"github.com/yunhanshu-net/pkg/constants"
@@ -190,12 +191,7 @@ func (c *Context) GetConfig() interface{} {
 
 // generateConfigKey 生成配置键
 func (c *Context) generateConfigKey() string {
-	// 处理路由路径，将 / 替换为 . 以安全地用作配置键
-	safeRouter := strings.ReplaceAll(c.router, "/", ".")
-	// 移除前后的点
-	safeRouter = strings.Trim(safeRouter, ".")
-	// 使用大写 method
-	return fmt.Sprintf("function.%s.%s", safeRouter, strings.ToUpper(c.method))
+	return usercall.GenerateConfigKey(c.router, c.method)
 }
 
 // ===== 基础信息方法 =====

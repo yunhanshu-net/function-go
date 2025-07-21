@@ -9,13 +9,7 @@ import (
 
 // generateConfigKey 生成配置键（复制自 default.go）
 func generateConfigKey(router, method string) string {
-	// 将路由中的路径分隔符替换为点号
-	routerKey := strings.ReplaceAll(strings.Trim(router, "/"), "/", ".")
-	// 去除前后多余的点号
-	routerKey = strings.Trim(routerKey, ".")
-
-	// 生成配置键格式: function.{router}.{method}
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(method))
+	return usercall.GenerateConfigKey(router, method)
 }
 
 func main() {

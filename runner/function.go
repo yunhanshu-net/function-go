@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
+	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
 	"strings"
 )
 
@@ -188,8 +189,8 @@ func (r *Runner) registerAutoUpdateConfig(router string, method string, autoConf
 	// 移除前后的点
 	safeRouter = strings.Trim(safeRouter, ".")
 
-	// 生成配置键，使用大写 method
-	configKey := fmt.Sprintf("function.%s.%s", safeRouter, strings.ToUpper(method))
+	// 生成配置键
+	configKey := usercall.GenerateConfigKey(router, method)
 
 	// 获取配置管理器
 	configManager := GetConfigManager()

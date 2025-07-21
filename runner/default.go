@@ -193,12 +193,7 @@ func (r *Runner) writeInitialConfig(worker *routerInfo, configStruct interface{}
 
 // generateConfigKey 生成配置键
 func generateConfigKey(router, method string) string {
-	// 将路由中的路径分隔符替换为点号
-	routerKey := strings.ReplaceAll(strings.Trim(router, "/"), "/", ".")
-	// 去除前后多余的点号
-	routerKey = strings.Trim(routerKey, ".")
-	// 使用大写 method
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(method))
+	return usercall.GenerateConfigKey(router, method)
 }
 
 func (r *routerInfo) IsDefaultRouter() bool {

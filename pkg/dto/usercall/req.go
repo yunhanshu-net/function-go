@@ -8,6 +8,16 @@ import (
 	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
 
+// GenerateConfigKey 统一的配置key生成函数
+func GenerateConfigKey(router, method string) string {
+	// 将路由中的路径分隔符替换为点号
+	routerKey := strings.ReplaceAll(strings.Trim(router, "/"), "/", ".")
+	// 去除前后多余的点号
+	routerKey = strings.Trim(routerKey, ".")
+	// 使用大写 method
+	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(method))
+}
+
 // NoData 空数据结构
 type NoData struct{}
 
@@ -191,12 +201,7 @@ func (req *UpdateConfigReq) ToConfigData() *ConfigData {
 
 // GenerateConfigKey 生成配置键
 func (req *UpdateConfigReq) GenerateConfigKey() string {
-	// 将路由中的路径分隔符替换为点号
-	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
-	// 去除前后多余的点号
-	routerKey = strings.Trim(routerKey, ".")
-	// 使用大写 method
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(req.Method))
+	return GenerateConfigKey(req.Router, req.Method)
 }
 
 // GetConfigReq 配置获取请求
@@ -207,12 +212,7 @@ type GetConfigReq struct {
 
 // GenerateConfigKey 生成配置键
 func (req *GetConfigReq) GenerateConfigKey() string {
-	// 将路由中的路径分隔符替换为点号
-	routerKey := strings.ReplaceAll(strings.Trim(req.Router, "/"), "/", ".")
-	// 去除前后多余的点号
-	routerKey = strings.Trim(routerKey, ".")
-	// 使用大写 method
-	return fmt.Sprintf("function.%s.%s", routerKey, strings.ToUpper(req.Method))
+	return GenerateConfigKey(req.Router, req.Method)
 }
 
 // UpdateConfigResp 配置更新响应
