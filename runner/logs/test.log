@@ -1,0 +1,125 @@
+{"level":"DEBUG","ts":"2025-07-29 11:59:42.591","caller":"function-go/runner/context.go:24 [Debug]","msg":"这是调试信息"}
+{"level":"DEBUG","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"这是格式化调试信息: test"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:34 [Info]","msg":"这是信息日志"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"这是格式化信息日志: 123"}
+{"level":"WARN","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:44 [Warn]","msg":"这是警告日志"}
+{"level":"WARN","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:49 [Warnf]","msg":"","msg":"这是格式化警告日志: warning"}
+{"level":"ERROR","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:54 [Error]","msg":"这是错误日志","error":"测试错误"}
+{"level":"ERROR","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:59 [Errorf]","msg":"","msg":"这是格式化错误日志: error"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"开始处理请求: GET /api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"处理步骤 1"}
+{"level":"DEBUG","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"处理步骤 2"}
+{"level":"DEBUG","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"处理步骤 3"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:34 [Info]","msg":"请求处理完成"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"主测试函数中的日志"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"这条日志应该显示正确的文件名和行号"}
+{"level":"WARN","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:49 [Warnf]","msg":"","msg":"警告日志测试堆栈信息"}
+{"level":"INFO","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:34 [Info]","msg":"开始执行可能出错的操作"}
+{"level":"ERROR","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:54 [Error]","msg":"操作失败","error":"模拟的业务错误"}
+{"level":"ERROR","ts":"2025-07-29 11:59:42.592","caller":"function-go/runner/context.go:59 [Errorf]","msg":"","msg":"操作失败，错误详情: 模拟的业务错误"}
+{"level":"DEBUG","ts":"2025-07-29 12:01:17.804","caller":"function-go/runner/context.go:24 [Debug]","msg":"这是调试信息"}
+{"level":"DEBUG","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"这是格式化调试信息: test"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:34 [Info]","msg":"这是信息日志"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"这是格式化信息日志: 123"}
+{"level":"WARN","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:44 [Warn]","msg":"这是警告日志"}
+{"level":"WARN","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:49 [Warnf]","msg":"","msg":"这是格式化警告日志: warning"}
+{"level":"ERROR","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:54 [Error]","msg":"这是错误日志","error":"测试错误"}
+{"level":"ERROR","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:59 [Errorf]","msg":"","msg":"这是格式化错误日志: error"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"开始处理请求: GET /api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"处理步骤 1"}
+{"level":"DEBUG","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"处理步骤 2"}
+{"level":"DEBUG","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:29 [Debugf]","msg":"","msg":"处理步骤 3"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:34 [Info]","msg":"请求处理完成"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"主测试函数中的日志"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:39 [Infof]","msg":"","msg":"这条日志应该显示正确的文件名和行号"}
+{"level":"WARN","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:49 [Warnf]","msg":"","msg":"警告日志测试堆栈信息"}
+{"level":"INFO","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:34 [Info]","msg":"开始执行可能出错的操作"}
+{"level":"ERROR","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:54 [Error]","msg":"操作失败","error":"模拟的业务错误"}
+{"level":"ERROR","ts":"2025-07-29 12:01:17.805","caller":"function-go/runner/context.go:59 [Errorf]","msg":"","msg":"操作失败，错误详情: 模拟的业务错误"}
+{"level":"INFO","ts":"2025-07-29 12:02:37.205","caller":"testing/testing.go:1792 [tRunner]","msg":"","msg":"主测试函数中的日志","trace_id":"ctx-1753761757205980000"}
+{"level":"INFO","ts":"2025-07-29 12:02:37.206","caller":"function-go/runner/context_logger_test.go:91 [TestContextLoggerStackTrace]","msg":"","msg":"这条日志应该显示正确的文件名和行号","trace_id":"ctx-1753761757205980000"}
+{"level":"WARN","ts":"2025-07-29 12:02:37.206","caller":"function-go/runner/context_logger_test.go:91 [TestContextLoggerStackTrace]","msg":"","msg":"警告日志测试堆栈信息","trace_id":"ctx-1753761757205980000"}
+{"level":"INFO","ts":"2025-07-29 12:02:57.766","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753761777766639000"}
+{"level":"DEBUG","ts":"2025-07-29 12:02:57.767","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753761777766639000"}
+{"level":"DEBUG","ts":"2025-07-29 12:02:57.767","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753761777766639000"}
+{"level":"DEBUG","ts":"2025-07-29 12:02:57.767","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753761777766639000"}
+{"level":"INFO","ts":"2025-07-29 12:02:57.767","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"请求处理完成","trace_id":"ctx-1753761777766639000"}
+{"level":"INFO","ts":"2025-07-29 12:09:44.646","caller":"function-go/runner/context.go:47 [Infof]","msg":"","msg":"开始处理请求: GET /api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:09:44.647","caller":"function-go/runner/context.go:37 [Debugf]","msg":"","msg":"处理步骤 1"}
+{"level":"DEBUG","ts":"2025-07-29 12:09:44.647","caller":"function-go/runner/context.go:37 [Debugf]","msg":"","msg":"处理步骤 2"}
+{"level":"DEBUG","ts":"2025-07-29 12:09:44.647","caller":"function-go/runner/context.go:37 [Debugf]","msg":"","msg":"处理步骤 3"}
+{"level":"INFO","ts":"2025-07-29 12:09:44.647","caller":"function-go/runner/context.go:42 [Info]","msg":"请求处理完成"}
+{"level":"INFO","ts":"2025-07-29 12:10:43.469","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753762243469554000"}
+{"level":"DEBUG","ts":"2025-07-29 12:10:43.470","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753762243469554000"}
+{"level":"DEBUG","ts":"2025-07-29 12:10:43.470","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753762243469554000"}
+{"level":"DEBUG","ts":"2025-07-29 12:10:43.470","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753762243469554000"}
+{"level":"INFO","ts":"2025-07-29 12:10:43.470","caller":"function-go/runner/context_logger_test.go:75 [TestContextLoggerUsage]","msg":"请求处理完成","trace_id":"ctx-1753762243469554000"}
+{"level":"INFO","ts":"2025-07-29 12:13:09.042","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:09.046","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:09.046","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:09.046","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3"}
+{"level":"INFO","ts":"2025-07-29 12:13:09.046","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:25.392","caller":"function-go/runner/context_logger_test.go:35 [func1]","msg":"这是调试信息"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:36 [func1]","msg":"","msg":"这是格式化调试信息: test"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:40 [func2]","msg":"这是信息日志"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:41 [func2]","msg":"","msg":"这是格式化信息日志: 123"}
+{"level":"WARN","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:45 [func3]","msg":"这是警告日志"}
+{"level":"WARN","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:46 [func3]","msg":"","msg":"这是格式化警告日志: warning"}
+{"level":"ERROR","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:51 [func4]","msg":"这是错误日志","error":"测试错误"}
+{"level":"ERROR","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:52 [func4]","msg":"","msg":"这是格式化错误日志: error"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2"}
+{"level":"DEBUG","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:90 [TestContextLoggerStackTrace]","msg":"","msg":"主测试函数中的日志"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:86 [func1]","msg":"","msg":"这条日志应该显示正确的文件名和行号"}
+{"level":"WARN","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:87 [func1]","msg":"","msg":"警告日志测试堆栈信息"}
+{"level":"INFO","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:102 [func1]","msg":"开始执行可能出错的操作"}
+{"level":"ERROR","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:107 [func1]","msg":"操作失败","error":"模拟的业务错误"}
+{"level":"ERROR","ts":"2025-07-29 12:13:25.393","caller":"function-go/runner/context_logger_test.go:108 [func1]","msg":"","msg":"操作失败，错误详情: 模拟的业务错误"}
+{"level":"INFO","ts":"2025-07-29 12:17:19.311","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:17:19.312","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1"}
+{"level":"DEBUG","ts":"2025-07-29 12:17:19.312","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2"}
+{"level":"DEBUG","ts":"2025-07-29 12:17:19.312","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3"}
+{"level":"INFO","ts":"2025-07-29 12:17:19.312","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成"}
+{"level":"INFO","ts":"2025-07-29 12:18:14.730","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753762694730874000"}
+{"level":"DEBUG","ts":"2025-07-29 12:18:14.731","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753762694730874000"}
+{"level":"DEBUG","ts":"2025-07-29 12:18:14.731","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753762694730874000"}
+{"level":"DEBUG","ts":"2025-07-29 12:18:14.731","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753762694730874000"}
+{"level":"INFO","ts":"2025-07-29 12:18:14.731","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753762694730874000"}
+{"level":"INFO","ts":"2025-07-29 12:22:54.561","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753762974561009000"}
+{"level":"DEBUG","ts":"2025-07-29 12:22:54.562","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753762974561009000"}
+{"level":"DEBUG","ts":"2025-07-29 12:22:54.562","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753762974561009000"}
+{"level":"DEBUG","ts":"2025-07-29 12:22:54.562","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753762974561009000"}
+{"level":"INFO","ts":"2025-07-29 12:22:54.562","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753762974561009000"}
+{"level":"INFO","ts":"2025-07-29 12:24:33.567","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753763073567954000"}
+{"level":"DEBUG","ts":"2025-07-29 12:24:33.569","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753763073567954000"}
+{"level":"DEBUG","ts":"2025-07-29 12:24:33.569","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753763073567954000"}
+{"level":"DEBUG","ts":"2025-07-29 12:24:33.569","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753763073567954000"}
+{"level":"INFO","ts":"2025-07-29 12:24:33.569","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753763073567954000"}
+{"level":"INFO","ts":"2025-07-29 12:24:54.655","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","method":"GET","router":"/api/demo/test","trace_id":"ctx-1753763094655615000"}
+{"level":"DEBUG","ts":"2025-07-29 12:24:54.656","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753763094655615000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:24:54.656","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753763094655615000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:24:54.656","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753763094655615000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:24:54.656","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753763094655615000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:27:12.318","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753763232318579000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:12.319","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753763232318579000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:12.320","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753763232318579000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:12.320","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753763232318579000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:27:12.320","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753763232318579000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:27:24.264","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753763244264913000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:24.265","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753763244264913000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:24.265","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753763244264913000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:24.265","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753763244264913000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:27:24.265","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753763244264913000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:27:49.852","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","user":"","version":"","runner":"","trace_id":"ctx-1753763269852466000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:49.853","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753763269852466000","method":"GET","router":"/api/demo/test","user":"","version":"","runner":""}
+{"level":"DEBUG","ts":"2025-07-29 12:27:49.853","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","user":"","version":"","runner":"","trace_id":"ctx-1753763269852466000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:27:49.853","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","user":"","version":"","runner":"","trace_id":"ctx-1753763269852466000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:27:49.853","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753763269852466000","method":"GET","router":"/api/demo/test","user":"","version":"","runner":""}
+{"level":"INFO","ts":"2025-07-29 12:28:13.926","caller":"function-go/runner/context_logger_test.go:64 [func1]","msg":"","msg":"开始处理请求: GET /api/demo/test","trace_id":"ctx-1753763293926051000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:28:13.927","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 1","trace_id":"ctx-1753763293926051000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:28:13.927","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 2","trace_id":"ctx-1753763293926051000","method":"GET","router":"/api/demo/test"}
+{"level":"DEBUG","ts":"2025-07-29 12:28:13.927","caller":"function-go/runner/context_logger_test.go:68 [func1]","msg":"","msg":"处理步骤 3","trace_id":"ctx-1753763293926051000","method":"GET","router":"/api/demo/test"}
+{"level":"INFO","ts":"2025-07-29 12:28:13.927","caller":"function-go/runner/context_logger_test.go:71 [func1]","msg":"请求处理完成","trace_id":"ctx-1753763293926051000","method":"GET","router":"/api/demo/test"}

@@ -1,0 +1,18 @@
+{
+  "method": "POST",
+  "router": "/math/file_hash",
+  "request": {
+    "files": [
+      {
+        "name": "example.txt",
+        "size": 0,
+        "content_type": "text/plain",
+        "url": "https://www.example.com/",
+        "metadata": {
+          "description": "Example.com 主页"
+        }
+      }
+    ],
+    "algorithm": "md5"
+  }
+} 
