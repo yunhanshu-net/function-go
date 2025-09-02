@@ -25,6 +25,10 @@ type MultiSelectWidget struct {
 	// 回调配置
 	Callback string `json:"callback"` // 回调配置字符串
 
+	// 拼接配置（当后端字段是 string 类型时，如何将多选值拼接为字符串）
+	// 默认用英文逗号 ","，可通过标签 separator:"/" 覆盖
+	Separator string `json:"separator"`
+
 	//// 交互配置
 	//Disabled bool `json:"disabled"` // 是否禁用
 }
@@ -35,6 +39,7 @@ func newMultiSelectWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
 		MultipleLimit: 0,     // 默认不限制
 		CollapseTags:  false, // 默认不折叠标签
 		AllowCreate:   false, // 默认不允许创建
+		Separator:     ",",   // 默认使用逗号分隔
 	}
 
 	if info.Tags == nil {
@@ -78,6 +83,11 @@ func newMultiSelectWidget(info *tagx.RunnerFieldInfo) (Widget, error) {
 	// 设置回调配置
 	if callback, ok := tag["callback"]; ok && callback != "" {
 		multiSelect.Callback = strings.TrimSpace(callback)
+	}
+
+	// 设置拼接分隔符（当后端字段为 string 类型时，前端提交按该分隔符拼接）
+	if sep, ok := tag["separator"]; ok && sep != "" {
+		multiSelect.Separator = sep
 	}
 
 	//// 设置是否禁用

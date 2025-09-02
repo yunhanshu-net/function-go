@@ -1,0 +1,283 @@
+# LLMs - 大模型调用库
+
+这是一个抽象的大模型调用库，支持多种AI提供商，提供统一的接口进行AI对话。
+
+## 特性
+
+- **统一接口**：所有AI提供商使用相同的接口
+- **多提供商支持**：支持DeepSeek、千问、豆包、Kimi等
+- **配置管理**：支持配置文件管理API密钥
+- **错误处理**：完善的错误处理机制
+- **使用统计**：支持token使用统计
+- **易于扩展**：简单的接口设计，易于添加新提供商
+
+## 支持的提供商
+
+| 提供商 | 状态 | 说明 |
+|--------|------|------|
+| DeepSeek | ✅ 已实现 | 代码生成能力强，推荐使用 |
+| 千问 | ✅ 已实现 | 中文理解好，价格便宜 |
+| 豆包 | ❌ 待实现 | 价格最便宜 |
+| Kimi | ❌ 待实现 | 基础功能支持 |
+
+## 快速开始
+
+### 1. 基本使用
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/yunhanshu-net/function-go/pkg/llms"
+)
+
+func main() {
+    // 创建DeepSeek客户端
+    client, err := llms.NewLLMClient(llms.ProviderDeepSeek, "your-api-key")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 构造对话请求
+    req := &llms.ChatRequest{
+        Messages: []llms.Message{
+            {Role: "system", Content: "你是function-go框架专家"},
+            {Role: "user", Content: "请帮我创建一个图书管理系统"},
+        },
+        MaxTokens:  4000,
+        Temperature: 0.7,
+    }
+
+    // 调用AI
+    resp, err := client.Chat(context.Background(), req)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if resp.Error != "" {
+        fmt.Printf("错误: %s\n", resp.Error)
+        return
+    }
+
+    fmt.Printf("AI回答: %s\n", resp.Content)
+}
+```
+
+### 2. 使用配置文件
+
+```go
+// 加载配置文件
+err := llms.LoadConfig("config.json")
+if err != nil {
+    log.Fatal(err)
+}
+
+// 创建默认客户端
+client, err := llms.CreateDefaultClient()
+if err != nil {
+    log.Fatal(err)
+}
+
+// 使用客户端
+resp, err := client.Chat(context.Background(), req)
+```
+
+### 3. 多提供商使用
+
+```go
+// 支持的提供商列表
+providers := llms.GetSupportedProviders()
+for _, provider := range providers {
+    fmt.Printf("提供商: %s (%s)\n", 
+        provider, llms.GetProviderDisplayName(provider))
+}
+
+// 创建指定提供商客户端
+client, err := llms.NewLLMClient(llms.ProviderQwen, "your-qwen-api-key")
+```
+
+## 配置说明
+
+### 配置文件格式
+
+```json
+{
+  "providers": {
+    "deepseek": {
+      "api_key": "your-deepseek-api-key-here",
+      "base_url": "https://api.deepseek.com/v1/chat/completions",
+      "timeout": 60
+    },
+    "qwen": {
+      "api_key": "your-qwen-api-key-here",
+      "base_url": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+      "timeout": 60
+    }
+  },
+  "default": "deepseek"
+}
+```
+
+### 环境变量支持
+
+你也可以通过环境变量设置API密钥：
+
+```bash
+export DEEPSEEK_API_KEY="your-api-key"
+export QWEN_API_KEY="your-api-key"
+```
+
+## API参考
+
+### 核心接口
+
+#### LLMClient
+
+```go
+type LLMClient interface {
+    // Chat 核心方法：根据对话列表返回AI回答
+    Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error)
+    
+    // GetModelName 获取模型名称
+    GetModelName() string
+    
+    // GetProvider 获取提供商名称
+    GetProvider() string
+}
+```
+
+#### ChatRequest
+
+```go
+type ChatRequest struct {
+    Messages   []Message `json:"messages"`   // 对话历史
+    Model     string    `json:"model"`       // 模型名称（可选）
+    MaxTokens int       `json:"max_tokens"`  // 最大token数（可选）
+    Temperature float64 `json:"temperature"` // 温度参数（可选）
+}
+```
+
+#### ChatResponse
+
+```go
+type ChatResponse struct {
+    Content string `json:"content"` // AI回答内容
+    Error   string `json:"error"`   // 错误信息（如果有）
+    Usage   *Usage `json:"usage"`   // 使用统计（可选）
+}
+```
+
+### 工厂函数
+
+```go
+// 创建LLM客户端
+func NewLLMClient(provider Provider, apiKey string) (LLMClient, error)
+
+// 获取支持的提供商列表
+func GetSupportedProviders() []Provider
+
+// 获取提供商显示名称
+func GetProviderDisplayName(provider Provider) string
+```
+
+### 配置管理
+
+```go
+// 加载配置文件
+func LoadConfig(configPath string) error
+
+// 创建默认客户端
+func CreateDefaultClient() (LLMClient, error)
+
+// 从配置创建客户端
+func CreateClientFromConfig(provider Provider) (LLMClient, error)
+```
+
+## 扩展新提供商
+
+要添加新的AI提供商，只需要：
+
+1. 实现`LLMClient`接口
+2. 在`factory.go`中添加新的case
+3. 在`Provider`常量中添加新值
+
+示例：
+
+```go
+// 新提供商实现
+type NewProviderClient struct {
+    APIKey string
+}
+
+func (n *NewProviderClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error) {
+    // 实现具体的API调用逻辑
+}
+
+func (n *NewProviderClient) GetModelName() string {
+    return "new-provider-model"
+}
+
+func (n *NewProviderClient) GetProvider() string {
+    return "NewProvider"
+}
+
+// 在factory.go中添加
+case ProviderNewProvider:
+    return NewNewProviderClient(apiKey), nil
+```
+
+## 最佳实践
+
+### 1. 错误处理
+
+```go
+resp, err := client.Chat(ctx, req)
+if err != nil {
+    // 处理网络错误、超时等
+    log.Printf("调用失败: %v", err)
+    return
+}
+
+if resp.Error != "" {
+    // 处理API返回的错误
+    log.Printf("API错误: %s", resp.Error)
+    return
+}
+```
+
+### 2. 超时控制
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+resp, err := client.Chat(ctx, req)
+```
+
+### 3. 重试机制
+
+```go
+var resp *ChatResponse
+var err error
+
+for i := 0; i < 3; i++ {
+    resp, err = client.Chat(ctx, req)
+    if err == nil && resp.Error == "" {
+        break
+    }
+    time.Sleep(time.Duration(i+1) * time.Second)
+}
+```
+
+## 许可证
+
+MIT License
+
+
+
+
+

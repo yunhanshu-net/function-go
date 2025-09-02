@@ -14,6 +14,26 @@ import (
 	"github.com/yunhanshu-net/pkg/logger"
 )
 
+var sub *nats.Subscription
+
+var conn *nats.Conn
+
+func getConn() *nats.Conn {
+	if conn == nil {
+		connect, err := nats.Connect(nats.DefaultURL)
+		if err != nil {
+			panic(err)
+		}
+		conn = connect
+	}
+	return conn
+}
+
+func PushRuntime(msg *nats.Msg) error {
+	msg.Subject = "function-runner.sub"
+	return getConn().PublishMsg(msg)
+}
+
 // New 创建一个新的Runner实例
 func New() *Runner {
 	runner, err := runnerproject.NewRunner(env.User, env.Name, env.Root, env.Version)
@@ -28,7 +48,7 @@ func New() *Runner {
 	configManager.SetStorage(localStorage)
 
 	return &Runner{
-		idle:      5,
+		idle:      0,
 		detail:    runner,
 		routerMap: make(map[string]*routerInfo),
 		down:      make(chan struct{}, 1),
@@ -116,30 +136,39 @@ func (r *Runner) connectNats(ctx context.Context) error {
 
 	// 设置消息处理
 	subscribe, err := r.natsConn.QueueSubscribe(subject, subject, func(msg *nats.Msg) {
-		r.lastHandelTs = time.Now()
-		start := time.Now()
+		go func() {
+			r.lastHandelTs = time.Now()
+			start := time.Now()
 
-		// 创建响应消息
-		respMsg := nats.NewMsg(msg.Reply)
-		ctx1 := context.WithValue(context.Background(), constants.TraceID, msg.Header.Get(constants.TraceID))
-		rspData, err := r.call(ctx1, msg)
+			// 创建响应消息
+			respMsg := nats.NewMsg("function-runner.sub")
+			ctx1 := context.WithValue(context.Background(), constants.TraceID, msg.Header.Get(constants.TraceID))
+			rspData, err := r.call(ctx1, msg)
 
-		if err != nil {
-			respMsg.Header.Set("code", "-1")
-			respMsg.Header.Set("msg", err.Error())
-			logger.Errorf(ctx, "处理请求失败: %v", err)
-		} else {
-			respMsg.Data = rspData
-			respMsg.Header.Set("code", "0")
-		}
+			respMsg.Header = msg.Header
+			if err != nil {
+				respMsg.Header.Set("code", "-1")
+				respMsg.Header.Set("msg", err.Error())
+				logger.Errorf(ctx, "处理请求失败: %v", err)
+			} else {
+				respMsg.Data = rspData
+				respMsg.Header.Set("code", "0")
+			}
 
-		// 响应请求
-		if err := msg.RespondMsg(respMsg); err != nil {
-			logger.Errorf(ctx, "响应请求失败: %v", err)
-			return
-		}
+			//推送消息给function-server 不经过runtime
+			err = r.natsConn.PublishMsg(respMsg)
+			if err != nil {
+				logger.Errorf(ctx, "响应请求失败: %v", err)
+			}
+			//logger.Infof(ctx, "响应消息成功：%s", respMsg.Data)
+			// 响应请求
+			//if err := msg.RespondMsg(respMsg); err != nil {
+			//	logger.Errorf(ctx, "响应请求失败: %v", err)
+			//	return
+			//}
 
-		logger.Debugf(ctx, "请求处理完成，耗时: %v", time.Since(start))
+			logger.Debugf(ctx, "请求处理完成，耗时: %v", time.Since(start))
+		}()
 	})
 	logger.Infof(ctx, "已连接到NATS服务器，监听主题: %s", subject)
 	if err != nil {
@@ -179,7 +208,6 @@ func (r *Runner) close(ctx context.Context) error {
 
 	// 标记为已关闭
 	r.isClosed = true
-	now := time.Now()
 
 	var closeErr error
 
@@ -227,6 +255,5 @@ func (r *Runner) close(ctx context.Context) error {
 		logger.Infof(ctx, "NATS连接已关闭")
 	}
 
-	logger.Infof(ctx, "Runner资源清理完成，耗时: %v", time.Since(now))
 	return closeErr
 }

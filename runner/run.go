@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/nats-io/nats.go"
 	"runtime"
 	"time"
 
@@ -49,6 +50,12 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 			logger.Infof(ctx, "%s runcher发起关闭请求，关闭连接", r.uuid)
 			return
 		case <-ticker.C:
+			status := r.natsConn.Status()
+			if status != nats.CONNECTED {
+				logger.Errorf(ctx, "%v 当前连接不正常，已经自己释放连接，并结束进程", status)
+				return
+			}
+
 			if r.idle > 0 {
 				ts := time.Now().Unix()
 				d := ts - r.lastHandelTs.Unix()
@@ -143,7 +150,7 @@ func (r *Runner) runCmd(ctx context.Context, req *request.RunFunctionReq) {
 
 	marshal, err := json.Marshal(resp)
 	if err != nil {
-		logger.ErrorContextf(ctx, "响应序列化失败: %s", err.Error())
+		logger.Errorf(ctx, "响应序列化失败: %s", err.Error())
 		fmt.Println("<Response>{\"code\":500,\"msg\":\"响应序列化失败\"}</Response>")
 		return
 	}

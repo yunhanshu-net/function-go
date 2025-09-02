@@ -1,11 +1,8 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
-
-	"github.com/yunhanshu-net/pkg/logger"
 
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/view/widget"
@@ -98,27 +95,6 @@ func (f *FieldInfo) ToFormRequestParamInfo() *FormRequestParamInfo {
 		Show:         show,
 		Hidden:       hidden,
 	}
-}
-
-// NewFormRequestParams 兼容旧接口 - 使用新的FormBuilder但返回旧格式
-func NewFormRequestParams(el interface{}, renderType string) (*FormRequestParams, error) {
-	// 使用新的统一响应
-	unifiedResponse, err := NewUnifiedFormResponse(el, renderType)
-	if err != nil {
-		logger.Errorf(context.Background(), "NewFormRequestParams error: %+v", err)
-		return nil, err
-	}
-
-	// 转换为旧格式
-	children := make([]*FormRequestParamInfo, 0, len(unifiedResponse.Fields))
-	for _, field := range unifiedResponse.Fields {
-		children = append(children, field.ToFormRequestParamInfo())
-	}
-
-	return &FormRequestParams{
-		RenderType: unifiedResponse.RenderType,
-		Children:   children,
-	}, nil
 }
 
 func newFormRequestParamInfo(tag *tagx.RunnerFieldInfo) (*FormRequestParamInfo, error) {

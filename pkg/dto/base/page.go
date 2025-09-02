@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 // Paginated 分页结果结构体
@@ -43,10 +44,11 @@ func (i *PageInfoReq) GetLimit(defaultSize ...int) int {
 
 // GetOffset 获取分页偏移量
 func (i *PageInfoReq) GetOffset() int {
-	if i.Page < 1 { // 如果 Page 小于 1，设置为 1
-		i.Page = 1
+	page := i.Page
+	if page < 1 { // 如果 Page 小于 1，设置为 1
+		page = 1
 	}
-	return (i.Page - 1) * i.GetLimit() // 计算偏移量
+	return (page - 1) * i.GetLimit() // 计算偏移量
 }
 
 // SafeColumn 检查列名是否安全（防SQL注入）
@@ -120,24 +122,27 @@ func AutoPaginate[T any](ctx context.Context, db *gorm.DB, model interface{}, da
 		pageInfo = new(PageInfoReq)
 	}
 
+	// 修复：克隆数据库连接，避免污染原始连接
+	dbClone := db.Session(&gorm.Session{})
+
 	// 获取分页大小
 	pageSize := pageInfo.GetLimit()
 	offset := pageInfo.GetOffset()
 
 	// 查询总数
 	var totalCount int64
-	if err := db.Model(model).Count(&totalCount).Error; err != nil {
+	if err := dbClone.Model(model).Count(&totalCount).Error; err != nil {
 		return nil, fmt.Errorf("分页查询统计总数失败: %w", err)
 	}
 
 	// 应用排序条件
 	sortStr := pageInfo.GetSorts()
 	if sortStr != "" {
-		db = db.Order(sortStr)
+		dbClone = dbClone.Order(sortStr)
 	}
 
 	// 查询当前页数据
-	if err := db.Offset(offset).Limit(pageSize).Find(data).Error; err != nil {
+	if err := dbClone.Offset(offset).Limit(pageSize).Find(data).Error; err != nil {
 		return nil, fmt.Errorf("分页查询数据失败: %w", err)
 	}
 

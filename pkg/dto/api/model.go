@@ -48,6 +48,10 @@ type Info struct {
 	ParamsData   interface{} `json:"params_data"`   // 配置初始值
 }
 
+func (i *Info) HasConfig() bool {
+	return i.ParamsConfig != nil && i.ParamsData != nil
+}
+
 func (i *Info) GetTreePath() string {
 	return fmt.Sprintf("/%s/%s/%s/", i.User, i.Runner, strings.Trim(i.Router, "/"))
 }

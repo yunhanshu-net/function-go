@@ -1,0 +1,154 @@
+### Function-Go 命名/表名/函数组规范（极简）
+
+聚焦三件事：命名一致、表名蛇形、函数组同文件。配一个最小可运行示例即可覆盖 80% 用法。
+
+### 背景与目的（为什么需要这份规范）
+- 大模型生成代码常以“单文件”为粒度，对其他文件“无感知”。不同文件并行生成时，极易出现“同包内命名冲突”和“表名冲突”。
+- 典型冲突：`type Order`、`func Create()`、`var Option`、`order` 表名、`/api/create` 路径等在不同文件重复。
+- 影响：编译失败（重复标识符）、AutoMigrate 表冲突、API 路径覆盖、运行期行为异常。
+- 解决思路：统一使用“功能前缀”贯穿 Go 标识符与数据库命名；Go 使用驼峰前缀（如 `IntelTicket...`，结构体用单数），表名/API/EnglishName 使用下划线前缀（如 `intel_ticket`）。
+- 目标：让每个文件都能“自洽、可独立生成”，同时与其他文件“可并存、零冲突”。
+
+### 一、核心规则（1分钟）
+- 文件名用下划线：`intel_ticket.go`
+- 函数组同文件定义与使用：`IntelTicketGroup`
+- 统一前缀：函数/结构体/请求/响应/配置均以功能名前缀开头
+- 表名蛇形：`ModelName` ↔ `model_name`（`IntelTicket` ↔ `intel_ticket`）
+- 最小演示：1 个 List（table）+ 1 个 Create（form）
+
+### 二、最小可运行示例
+```go
+// 文件：intel_ticket.go
+package form_table_example
+
+import (
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/runner"
+    "github.com/yunhanshu-net/pkg/query"
+)
+
+var IntelTicketGroup = &runner.FunctionGroup{
+    CnName: "工单(最小)",
+    EnName: "intel_ticket",
+}
+
+type IntelTicket struct {
+    ID        int    `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:ID" permission:"read"`
+    CreatedAt int64  `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    Title     string `json:"title" runner:"name:标题" widget:"type:input" validate:"required,min=2,max=50"`
+}
+
+func (IntelTicket) TableName() string {
+    return "intel_ticket"
+}
+
+type IntelTicketListReq struct {
+    query.PageInfoReq `runner:"-"`
+}
+
+type IntelTicketCreateReq struct {
+    Title string `json:"title" runner:"name:标题" widget:"type:input" validate:"required"`
+}
+
+type IntelTicketCreateResp struct {
+    Message string `json:"message" runner:"name:结果"`
+    ID      int    `json:"id" runner:"name:ID"`
+}
+
+func IntelTicketList(ctx *runner.Context, req *IntelTicketListReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    var rows []IntelTicket
+    return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.PageInfoReq).Build()
+}
+
+func IntelTicketCreate(ctx *runner.Context, req *IntelTicketCreateReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    row := &IntelTicket{Title: req.Title}
+    if err := db.Create(row).Error; err != nil {
+        return err
+    }
+    return resp.Form(&IntelTicketCreateResp{
+        Message: "创建成功",
+        ID:      row.ID,
+    }).Build()
+}
+
+var IntelTicketListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "intel_ticket_list",
+        ChineseName:  "工单-列表(最小)",
+        ApiDesc:      "最小示例",
+        Tags:         []string{"示例", "规范"},
+        Request:      &IntelTicketListReq{},
+        Response:     query.PaginatedTable[[]IntelTicket]{},
+        CreateTables: []interface{}{&IntelTicket{}},
+        Group:        IntelTicketGroup,
+    },
+    AutoCrudTable: &IntelTicket{},
+}
+
+var IntelTicketCreateOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "intel_ticket_create",
+        ChineseName:  "工单-新建(最小)",
+        ApiDesc:      "最小示例",
+        Tags:         []string{"示例", "规范"},
+        Request:      &IntelTicketCreateReq{},
+        Response:     &IntelTicketCreateResp{},
+        Group:        IntelTicketGroup,
+    },
+}
+
+func init() {
+    runner.Get("/form_table_example/intel_ticket_list", IntelTicketList, IntelTicketListOption)
+    runner.Post("/form_table_example/intel_ticket_create", IntelTicketCreate, IntelTicketCreateOption)
+}
+```
+
+### 三、命名映射速查表
+| 项 | 规则 | 示例 |
+|---|---|---|
+| 文件 | 下划线 | `intel_ticket.go` |
+| 函数组 | 同文件定义 | `IntelTicketGroup` |
+| 模型 | 单数，与前缀一致 | `IntelTicket` |
+| 表名 | 蛇形 | `intel_ticket` |
+| 列表函数 | 后缀 List | `IntelTicketList` |
+| 表单函数 | 后缀 Create | `IntelTicketCreate` |
+| 请求/响应/配置 | 前缀统一 + 语义化后缀 | `...ListReq` / `...CreateResp` / `...ListOption` |
+| API 路径 | 与 EnglishName 一致 | `/form_table_example/intel_ticket_list` |
+
+### 四、常见错误速查
+- 复用跨文件同名函数组 → 每文件自定义 `...Group`
+- 表名与模型不一致 → `ModelName` ↔ `model_name`
+- 路径/英文名用驼峰 → 一律小写下划线
+- 示例字段过多 → 2-3 个足够（`ID`、`CreatedAt`、`Title`）
+- List/Form 命名不统一 → `List/ListReq/ListOption`、`Create/CreateReq/FormOption`
+
+### 五、List vs Form（如何选）
+- 需要分页展示/搜索 → List（table）
+- 创建/编辑单条数据 → Form（form）
+- 只演示命名与表名 → 保留 1 个 List + 1 个 Create 即可
+
+### 六、命名冲突防护（推荐约定）
+- 全部使用功能前缀，避免包内重名：`IntelTicket...`（结构体单数）
+- Service 层：`IntelTicketAddService`、`IntelTicketUpdateService`、`IntelTicketDeleteService`、`IntelTicketGetByIDService`
+- 计算/校验/生成（包内私有）：`calcIntelTicket...`、`validateIntelTicket...`、`genIntelTicket...`、`ensureIntelTicket...`
+- DTO/转换（包内私有）：`toIntelTicketDTO`、`fromIntelTicketDTO`
+- 事务封装：`withIntelTicketTx(ctx, fn)` 或通过 `tx *gorm.DB` 传递
+- 变量命名：`ticketRows`、`createReq`、`createResp`、`listReq`
+
+示例（精简）：
+```go
+// 计算/校验/生成
+func calcIntelTicketPriority(title string) int { /* ... */ return 0 }
+func validateIntelTicketInput(req *IntelTicketCreateReq) error { return nil }
+func genIntelTicketNumber() string { return "TKT-..." }
+
+// Service 层
+func IntelTicketAddService(ctx *runner.Context, rows []*IntelTicket) error { /* ... */ return nil }
+```
+
+避免用法：
+- BAD：`AddService`、`Create`、`Handle`（无前缀，易冲突）
+- GOOD：`IntelTicketAddService`、`IntelTicketCreate`（统一前缀+语义化后缀）
+

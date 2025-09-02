@@ -1,0 +1,150 @@
+## 常见坑与细节点（精炼可复用）
+
+为 AI 生成函数提供“踩坑速查”，结合近期问题沉淀的高频细节点，便于后续复盘和复用。
+
+### 1) 表单参数绑定（GET vs POST）
+- 优先使用 POST 传参，更稳定。
+- 若使用 GET，必须为请求体字段补 `form:"..."` 标签，否则查询参数无法绑定。
+- 时间筛选单位统一为毫秒（ms）。
+- 业务枚举“全部”语义：如 `channel=全部` 表示不加该维度过滤。
+
+示例（NPS 统计）：
+```go
+type SurveyNpsAnalyticsReq struct {
+  ProjectID int    `json:"project_id" form:"project_id" ...`
+  StartAt   int64  `json:"start_at" form:"start_at" ...`
+  EndAt     int64  `json:"end_at" form:"end_at" ...`
+  Channel   string `json:"channel" form:"channel" ...`
+}
+```
+
+### 2) 自动建表（CreateTables）
+- 持久化涉及的所有表，统一在各 `Option.BaseConfig.CreateTables` 中声明。
+- 禁止在 Handler 内部 `AutoMigrate`，避免误导以及运行时隐式副作用。
+- 跨功能（提交/列表/统计）共用的表，都应在对应的 `Option` 里包含，保证首次调用即可自动建表。
+
+### 3) 日志排查（强烈建议）
+- 在核心 Handler 打印关键入参与统计结果，便于快速定位：
+  - 提交：记录 `project_id/score/channel/respondent/attachments?`。
+  - 统计：记录 `project_id/start_at/end_at/channel`、筛选后 `total`、分类计数与最终指标。
+- 统一使用 `ctx.Logger.Infof(...)`，天然带 `trace_id`。
+
+### 4) 统计口径一致性
+- 用一个基础查询构造器统一拼接筛选条件，避免“total 和分项口径不一致”。
+```go
+func baseQuery(ctx *runner.Context, req *Req) *gorm.DB { /* project_id + 时间 + 渠道 */ }
+// 之后基于 baseQuery(req) 分别 Count total/promoters/passives/detractors
+```
+- NPS 口径：`total=样本数；promoters=score>=9；passives=7-8；detractors<=6；NPS=(promoters/total - detractors/total)*100`。
+
+### 5) OnInputFuzzy 聚合与搜索
+- 仅对 List/Multiselect 场景做聚合；单选只返回静态信息，不做 `count/sum` 等聚合。
+- 聚合函数仅限：`sum/avg/min/max/count`；不支持 if/方差/百分位等；数量控制在 3-5 个。
+- 乘法聚合的变量来自同级请求字段（非 DisplayInfo）。
+- 参考规则：`OnInputFuzzy聚合计算的常见用法和规范.mdc`。
+
+### 6) 列表展示友好（避免显示纯 ID）
+- 通过冗余/拼装只读字段提升可读性：
+  - `gorm:"-" permission:"read"` 显示 `Name (Supplier)`、`Name (Building/Capacity)` 等。
+- 列表筛选字段建议配 `OnInputFuzzy`，支持输入即搜（如 `classroom_id`）。
+
+### 7) 校验与业务规则
+- 时间冲突校验：在 `OnInputValidateMap` 中对 `start_at/end_at/xxx_id` 组合做重叠校验（待审批/已审批均算冲突）。
+- 冲突提示友好化（强制）：返回具体冲突时间段与申请人，便于用户快速调整。例如：
+  - `03-12 09:00-10:00 已被 张三 预定(已通过)`
+  - `03-12 13:00-14:00 已被 李四 预定(待审批)`
+  - 最多列出 5 条，格式：`MM-DD HH:mm-HH:mm`，并附带状态。
+- 校验/计算/生成的内部辅助函数添加功能前缀，避免包内冲突（如 `SchoolClassroom...`、`IntelTicket...`）。
+
+### 7.1) 错误提示友好化（强制）
+面向终端用户的错误/校验信息，必须满足「看得懂、能决策、可行动」三要素：
+
+- 必须包含：
+  - 发生了什么（问题点）
+  - 为什么（关键原因/约束）
+  - 怎么办（下一步建议/可选方案）
+- 避免：
+  - 模糊词（如「参数错误/无效请求/失败」）
+  - 纯技术细节（SQL/栈信息/内部字段名）
+  - 只报错不指路（用户不知如何修正）
+
+常用模板（示例，按业务替换变量）：
+- 余额不足：`余额不足，需要¥{need}，余额¥{have}。请前往「校园卡充值」后再支付。`
+- 必填缺失：`请填写「{字段名}」。`
+- 范围越界：`{字段名} 需在 {min}~{max} 之间（当前：{val}）。`
+- 文件上传：`仅支持 {accept}，大小不超过 {max_size}。`
+- 时间冲突：`{MM-DD HH:mm}-{HH:mm} 已被 {申请人} 预定（{状态}），请避开或更换教室。`
+- 搜索无结果（单选）：`未找到匹配项，可更换关键词（例如：{建议关键词}）。`
+- 权限限制：`当前账号无权限执行该操作，请联系管理员分配权限。`
+
+代码实践（Go）：
+```go
+// form handler：直接 return err，由前端展示。
+if card.Balance < finalAmount {
+    return fmt.Errorf("余额不足，需要¥%.2f，余额¥%.2f。请前往\"校园卡充值\"后再支付。", finalAmount, card.Balance)
+}
+
+// OnInputValidate：返回错误消息字符串，避免长段落，1-2 句为宜。
+return &usercall.OnInputValidateResp{ErrorMsg: "03-12 09:00-10:00 已被 张三 预定(已通过)，请避开或更换教室。"}, nil
+```
+
+检查清单（提交前自查）：
+- 错误信息是否明确指出了字段/时间段/金额等关键上下文？
+- 是否提供了至少一个可执行的解决方案（如「去充值」「修改时间」「换关键词」）？
+- 是否避免了内部细节（SQL/表名/栈信息）？
+
+### 7.2) 生产标准要求（强制）
+- 严禁“模拟/占位/伪代码/演示用示例”混入生产功能：如果做不到，请明确返回“暂无法提供生产级实现”，禁止用临时代码替代。
+- 对无法在当前版本完成的能力，必须：
+  - 在功能返回里给出清晰错误信息（问题+原因+可选方案）。
+  - 在任务池/文档中记录后续接入方案（如将接入 `pdfcpu/unidoc` 实现 PDF 合并/拆分/压缩）。
+- 文件/数据处理必须遵循内存与IO规范：
+  - 避免一次性读入全部内容（优先流式处理，如 `io.Copy`）。
+  - 考虑大文件与重名冲突（zip 内采用去重命名策略：`name(1).ext`）。
+- 若实现中任何一环无法满足以上标准，应立即停止并回退，禁止“先占位上线”。
+
+### 7.3) 无法实现时的兜底策略（强制）
+- 不是“直接说做不到”，而是提供可执行替代方案/思路：
+  1) 外部可执行工具接入：
+     - 指定可执行程序放置路径（如 `./tools/pdfcpu`）或环境变量（如 `PDF_MERGE_CMD`）。
+     - 函数内部通过 `exec.Command` 调用该 CLI 完成合并/转换等能力。
+     - 错误文案必须提示“如何获取工具、放哪里、设置哪个环境变量、如何重试”。
+  2) 明确替代流程：
+     - 提供用户端可执行步骤（下载链接/安装命令/调用示例）。
+     - 暂不内置时，返回“原因+可行替代+后续计划”，给用户可行路径。
+  3) 仍无法提供时：
+     - 解释当前限制（依赖许可、性能/安全、时间），并给出“换一种思路”的建议（如改为批量打包、延时异步处理）。
+
+### 8) 文件字段
+- 仅使用 `*files.Files`，并加 `gorm:"type:json"` 存储元数据。
+- 上传与展示组件分离：请求用 `file_upload`，响应用 `file_display`。
+- `max_size` 必须带单位（如 `10MB/1.5GB/500KB/1024B`）。
+
+### 9) 命名与分组（强约束）
+- 一个文件就是一个完整系统，内部用 `runner.FunctionGroup` 组织功能。
+- 结构体单数；英文名、API 路径、表名全部蛇形：`intel_ticket`、`/form_table_example/intel_ticket_list`。
+- 统一前缀 + 语义化后缀：`IntelTicketList/IntelTicketCreate/...ListReq/...CreateOption`。
+- Service/Helper 统一前缀：`IntelTicketAddService/calcIntelTicket.../validateIntelTicket...`。
+
+### 10) 选项与默认值/变量
+- `default_value` 必须与 `options/example` 完全一致。
+- 变量值（如 `default_value/$today`）建议使用 `$` 前缀统一标识来源（按项目规范）。
+- `type` 表示 Go 类型（string/number/boolean），`widget` 表示 UI 组件（select/multiselect/...）。
+
+### 11) permission 标签（仅 table）
+- `permission:"read"` 仅列表显示；`create` 仅新增；`update` 仅编辑；`create,update` 新增编辑可见、列表不展示。
+- form 函数不需要 `permission` 标签。
+
+### 12) 时间字段规范
+- 系统时间：`CreatedAt/UpdatedAt` 使用 `autoCreateTime:milli/autoUpdateTime:milli`，不加 `format`。
+- 业务日期字段（如开始/结束/销售日期）才使用 `format:yyyy-MM-dd` 节省展示空间。
+
+### 13) 提示与示例（NPS 常见误区）
+- 统计一片 0：多因 GET 请求未加 `form` 标签绑定、或时间单位传成秒。
+- 无数据：先用“评分记录列表”确认是否有样本；必要时提交两条极端样例（10 分线上、0 分线下）快速验通路。
+- 渠道筛选：`channel=全部` 表示不加过滤。
+
+---
+
+建议：每次新增系统后，将以上清单过一遍，尤其是“参数绑定/建表/日志/展示友好/文件字段/命名分组”六个关键点。
+

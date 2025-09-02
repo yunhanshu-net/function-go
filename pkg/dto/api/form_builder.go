@@ -81,6 +81,9 @@ func (b *FormBuilder) BuildTableConfig(structType reflect.Type) (*TableConfig, e
 	if structType.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("输入参数必须是Struct类型或Struct切片类型，当前类型: %s", structType.Kind())
 	}
+	if structType.String() == "query.PageInfoReq" {
+		return &TableConfig{RenderType: response.RenderTypeTable}, nil
+	}
 
 	fields, err := b.parser.ParseStruct(structType)
 	if err != nil {

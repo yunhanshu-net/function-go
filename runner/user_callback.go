@@ -61,8 +61,8 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 	var res usercall.Response
 
 	// 记录请求参数
-	reqJSON, _ := json.Marshal(req)
-	logger.Infof(ctx, "处理回调 [类型:%s] [路由:%s] [方法:%s] 请求参数: %s", req.Type, req.Router, req.Method, string(reqJSON))
+	//reqJSON, _ := json.Marshal(req)
+	//logger.Infof(ctx, "处理回调 [类型:%s] [路由:%s] [方法:%s] 请求参数: %s", req.Type, req.Router, req.Method, string(reqJSON))
 
 	worker, exist := r.getRouter(req.Router, req.Method)
 	if !exist {
@@ -108,20 +108,24 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			return fmt.Errorf("OnPageLoad failed: %w", err)
 		}
 		type OnPageLoadResp struct {
-			Multiple bool        `json:"multiple"` //是否多返回值
-			Request  interface{} `json:"request"`  //会初始化前端的表单参数
-			Response interface{} `json:"response"` //会初始化前端的的响应参数
-			AutoRun  bool        `json:"auto_run"` //是否自动运行
+			Multiple   bool                        `json:"multiple"` //是否多返回值
+			Request    interface{}                 `json:"request"`  //会初始化前端的表单参数
+			Response   interface{}                 `json:"response"` //会初始化前端的的响应参数
+			AutoRun    bool                        `json:"auto_run"` //是否自动运行
+			DisableRun bool                        `json:"disable_run"`
+			Message    *usercall.OnPageLoadMessage `json:"message"`
 		}
 
 		if rsp == nil {
 			return resp.Form(&OnPageLoadResp{}).Build()
 		}
 		rs := &OnPageLoadResp{
-			Multiple: userResp.Multiple,
-			Request:  rsp.Request,
-			Response: userResp.GetData(),
-			AutoRun:  rsp.AutoRun,
+			Multiple:   userResp.Multiple,
+			Request:    rsp.Request,
+			Response:   userResp.GetData(),
+			DisableRun: rsp.DisableRun,
+			Message:    rsp.Message,
+			AutoRun:    rsp.AutoRun,
 		}
 		return resp.Form(rs).Build()
 
@@ -460,15 +464,19 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 		if tb.OnTableAddRows != nil {
 			rsp, err := tb.OnTableAddRows(ctx, &reqData)
 			if err != nil {
-				logger.Errorf(ctx, "回调处理失败 [类型:%s]: OnTableAddRowsReq 解码失败req:%+v %v", req.Type, req, err)
+				logger.Errorf(ctx, "回调处理失败 [类型:%s]: OnTableAddRowsReq 处理失败req:%+v %v", req.Type, req, err)
+				return err
 			}
 			respData = rsp
+
 		} else {
 			if tb.AutoCrudTable != nil {
 				err = tb.defaultAddRows(ctx, &reqData)
 				if err != nil {
 					logger.Errorf(ctx, "回调处理失败 [类型:%s]: defaultAddRows 执行失败 req:%+v %v", req.Type, req, err)
+					return err
 				}
+
 			}
 		}
 		res.Response = respData

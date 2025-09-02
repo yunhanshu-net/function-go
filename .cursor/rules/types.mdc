@@ -1,0 +1,148 @@
+# function-go 组件类型与标签规范示例
+
+## 核心原则
+
+在 function-go 框架中，**Go 类型直接对应组件类型**，系统会自动处理类型映射，用户无需关心底层细节。
+
+## 基础类型映射
+
+### 按 Go 类型分组
+
+#### 字符串类型 (string)
+| Go类型 | 组件类型 | 说明 | 典型应用场景 | 使用场景 |
+|--------|----------|------|-------------|----------|
+| string | input | 文本输入框 | 姓名、标题、描述、备注 | 请求/响应 |
+| string | input;mode:text_area | 多行文本输入 | 详细描述、长文本内容 | 请求/响应 |
+| string | input;mode:password | 密码输入框 | 密码、密钥、敏感信息 | 仅请求 |
+| string | select | 下拉选择框 | 状态、分类、选项 | 仅请求 |
+| string | radio | 单选框（多选一） | 性别、学历、状态、类型选择 | 仅请求 |
+| string | color | 颜色选择器 | 主题色、背景色、标识色 | 仅请求 |
+
+#### 数字类型 (int, float64)
+| Go类型 | 组件类型 | 说明 | 典型应用场景 | 使用场景 |
+|--------|----------|------|-------------|----------|
+| int | number | 整数输入框 | 年龄、数量、ID、序号 | 请求/响应 |
+| int | slider | 滑块组件 | 评分、进度、音量、亮度 | 请求/响应 |
+| float64 | number | 浮点数输入框 | 价格、金额、百分比、评分 | 请求/响应 |
+| float64 | slider | 滑块组件 | 百分比、评分、进度、音量 | 请求/响应 |
+
+#### 时间类型 (int64)
+| Go类型 | 组件类型 | 说明 | 典型应用场景 | 使用场景 |
+|--------|----------|------|-------------|----------|
+| int64 | datetime | 日期时间选择器 | 创建时间、更新时间、业务日期、时间戳 | 请求/响应 |
+
+#### 布尔类型 (bool)
+| Go类型 | 组件类型 | 说明 | 典型应用场景 | 使用场景 |
+|--------|----------|------|-------------|----------|
+| bool | switch | 开关组件 | 启用状态、开关控制 | 请求/响应 |
+
+#### 数组类型 ([]string, []int, []float64)
+| Go类型 | 组件类型 | 说明 | 典型应用场景 | 使用场景 |
+|--------|----------|------|-------------|----------|
+| []string | checkbox | 复选框 | 兴趣爱好、技能标签、权限选择 | 仅请求 |
+| []string | multiselect | 多选组件 | 技能标签、兴趣爱好、权限 | 请求/响应 |
+| []string | tag | 标签展示 | 兴趣爱好、技能标签、权限展示 | 仅响应 |
+| []int | multiselect | 数字多选 | 多选ID、数字标签 | 请求/响应 |
+| []float64 | multiselect | 浮点数多选 | 多选价格、多选评分 | 请求/响应 |
+
+#### 复杂类型 (struct, []struct, *files.Files)
+| Go类型 | 组件类型 | 说明 | 典型应用场景 | 使用场景 |
+|--------|----------|------|-------------|----------|
+| struct | form | 嵌套表单 | 地址信息、联系方式、配置对象 | 请求/响应 |
+| []struct | list | 复杂列表输入 | 订单项、配置列表、数据集合 | 请求/响应 |
+| *files.Files | file_upload | 文件上传 | 头像、文档、图片、附件 | 仅请求 |
+| *files.Files | file_display | 文件展示 | 简历、文档、图片展示 | 仅响应 |
+
+---
+
+## 标签使用规范
+
+### 标签顺序建议
+- `json`、`gorm`（如需建表）、`form`（如有）、`runner`、`widget`、`data`、`search`（仅table）、`permission`（仅table）、`validate`
+- **gorm标签仅用于需要建表的model结构体**（即table函数、需要持久化的业务数据结构），form/请求/配置体不需要写gorm标签
+
+---
+
+## 一、表单请求结构体（form请求）
+
+// 用户注册请求（form请求结构体，所有输入组件示例）
+```go
+type UserRegisterReq struct {
+    Username string `json:"username" runner:"name:用户名" widget:"type:input" data:"example:john_doe" validate:"required,min=3,max=20"` // 用户名，单行文本
+    Password string `json:"password" runner:"name:密码" widget:"type:input;mode:password" data:"example:123456" validate:"required,min=6,max=20"` // 密码，密码输入
+    Bio string `json:"bio" runner:"name:个人简介" widget:"type:input;mode:text_area" data:"example:热爱编程"` // 个人简介，多行文本
+    Age int `json:"age" runner:"name:年龄" widget:"type:number;min:18;max:65;unit:岁" data:"example:25" validate:"required,min=18,max=65"` // 年龄，数字输入
+    Score float64 `json:"score" runner:"name:分数" widget:"type:number;min:0;max:100;precision:2" data:"example:88.5"` // 分数，浮点数
+    Role string `json:"role" runner:"name:角色" widget:"type:select;options:管理员,普通用户,访客" data:"default_value:普通用户" validate:"required"` // 角色，下拉选择
+    Gender string `json:"gender" runner:"name:性别" widget:"type:radio;options:男,女;direction:horizontal" data:"example:男" validate:"required,oneof=男 女"` // 性别，单选
+    Hobbies []string `json:"hobbies" runner:"name:兴趣爱好" widget:"type:checkbox;options:阅读,音乐,运动,旅行,摄影,烹饪" data:"example:阅读,音乐"` // 兴趣爱好，多选
+    Tags []string `json:"tags" runner:"name:标签" widget:"type:multiselect" data:"example:技术,产品"` // 标签，多选
+    Birthday int64 `json:"birthday" runner:"name:生日" widget:"type:datetime;kind:date;format:yyyy-MM-dd" data:"example:2000-01-01"` // 生日，日期选择
+    MeetingTime int64 `json:"meeting_time" runner:"name:会议时间" widget:"type:datetime;kind:time;format:HH:mm" data:"example:18:30"` // 会议时间，时间选择
+    WorkPeriod []int64 `json:"work_period" runner:"name:工作区间" widget:"type:datetime;kind:daterange;format:yyyy-MM-dd" data:"example:2023-01-01,2023-12-31"` // 工作区间，日期区间
+    // 主题色，颜色选择，支持格式、默认值和预设色板
+    ThemeColor string `json:"theme_color" runner:"name:主题色" widget:"type:color;format:hex;predefine:#409EFF,#67C23A,#E6A23C,#F56C6C;show_alpha:false" data:"example:#409EFF;default_value:#409EFF"` // 主题色，颜色选择（6位hex）
+    ThemeColorWithAlpha string `json:"theme_color_with_alpha" runner:"name:主题色(带透明度)" widget:"type:color;format:hex;predefine:#409EFF,#67C23A,#E6A23C,#F56C6C;show_alpha:true" data:"example:#409EFFFF;default_value:#409EFFFF"` // 主题色，颜色选择（8位hex）
+    BackgroundColorRGBA string `json:"background_color_rgba" runner:"name:背景色(RGBA)" widget:"type:color;format:rgba;predefine:rgba(255,255,255,0.9),rgba(0,0,0,0.8);show_alpha:true" data:"example:rgba(255,255,255,0.9);default_value:rgba(255,255,255,1)"` // 背景色，RGBA格式
+    Avatar *files.Files `json:"avatar" runner:"name:头像" widget:"type:file_upload;accept:.jpg,.png,.gif;max_size:5MB" data:"example:avatar.jpg"` // 头像上传（注意：max_size必须使用带单位的格式，如10MB、1.5GB等）
+    AgreeTerms bool `json:"agree_terms" runner:"name:同意条款" widget:"type:switch;true_label:同意;false_label:不同意" data:"example:true" validate:"required"` // 同意条款，开关
+    Progress int `json:"progress" runner:"name:进度" widget:"type:slider;min:0;max:100;step:1" data:"example:60"` // 进度，滑块
+    // 用户标签，多选且支持自定义创建
+    UserTags []string `json:"user_tags" runner:"name:用户标签" widget:"type:multiselect;allow_create:true" data:"example:VIP,新用户"` // 用户标签，多选，可自定义创建
+    Address struct {
+        Province string `json:"province" runner:"name:省份" widget:"type:input" data:"example:浙江省"`
+        City     string `json:"city" runner:"name:城市" widget:"type:input" data:"example:杭州市"`
+        Detail   string `json:"detail" runner:"name:详细地址" widget:"type:input" data:"example:西湖区"`
+    } `json:"address" runner:"name:地址" widget:"type:form"` // 地址，嵌套表单
+    Contacts []struct {
+        Name  string `json:"name" runner:"name:姓名" widget:"type:input" data:"example:李四"`
+        Phone string `json:"phone" runner:"name:电话" widget:"type:input" data:"example:13800000000"`
+    } `json:"contacts" runner:"name:联系人" widget:"type:list"` // 联系人，列表输入
+}
+```
+
+---
+
+## 二、表单响应结构体（form响应）
+
+// 用户注册响应（form响应结构体，所有输出展示组件示例）
+```go
+type UserRegisterResp struct {
+    UserID   int    `json:"user_id" runner:"name:用户ID" widget:"type:number" data:"example:1001"` // 用户ID
+    Username string `json:"username" runner:"name:用户名" widget:"type:input" data:"example:john_doe"` // 用户名
+    Email    string `json:"email" runner:"name:邮箱" widget:"type:input" data:"example:john@example.com"` // 邮箱
+    Name     string `json:"name" runner:"name:真实姓名" widget:"type:input" data:"example:张三"` // 真实姓名
+    CreatedAt int64 `json:"created_at" runner:"name:注册时间" widget:"type:datetime;kind:datetime" data:"example:1705292200000"` // 注册时间戳
+    // 简历文件展示，仅用于输出展示
+    Resume *files.Files `json:"resume" runner:"name:简历" widget:"type:file_display" data:"example:resume.pdf"` // 简历展示（响应专用）
+}
+```
+
+---
+
+## 三、表格结构体（table）
+
+> 【规范说明】search标签建议收敛：
+> - 枚举/多选字段只用in, not_in
+> - 区间字段只用gte, lte, not_eq
+> - 文本字段只用like, not_like
+> - 避免eq, gt, lt等重复或不常用条件，防止前端筛选项过多
+> - search标签的第一个条件为默认展示的搜索条件，建议将最常用、最友好的搜索方式放在首位
+> - 所有search条件应结合实际业务场景和数据库查询性能合理选择，避免无效或低效的筛选项
+
+// 商品管理（table结构体，含建表、搜索、权限等标签）
+```go
+type Product struct {
+    ID        int     `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:商品ID" data:"example:1" permission:"read"` // 主键，只读
+    Name      string  `json:"name" gorm:"column:name;comment:商品名称" runner:"name:商品名称" widget:"type:input" data:"example:iPhone 15" search:"like,in" validate:"required"` // 商品名称，模糊搜索为主
+    Category  string  `json:"category" gorm:"column:category;comment:商品分类" runner:"name:商品分类" widget:"type:select;options:手机,笔记本,平板,耳机,其他" data:"default_value:手机" search:"in,not_in" validate:"required"` // 商品分类
+    Price     float64 `json:"price" gorm:"column:price;comment:商品价格" runner:"name:商品价格" widget:"type:input;prefix:¥;precision:2" data:"example:5999.00" search:"gte,lte,in" validate:"required,min=0"` // 价格，区间搜索为主
+    Stock     int     `json:"stock" gorm:"column:stock;comment:库存数量" runner:"name:库存数量" widget:"type:input;suffix:件" data:"example:100" search:"gte,lte,not_eq" validate:"required,min=0"` // 库存
+    Status    bool    `json:"status" gorm:"column:status;comment:商品状态" runner:"name:商品状态" widget:"type:switch;true_label:启用;false_label:禁用" data:"example:true" search:"in,not_in" validate:"required"` // 状态
+    CreatedAt int64   `json:"created_at" gorm:"autoCreateTime:milli;comment:创建时间" runner:"name:创建时间" widget:"type:datetime;kind:datetime" data:"example:1705292200000" search:"gte,lte" permission:"read"` // 创建时间
+}
+// TableName方法，指定表名
+func (p *Product) TableName() string {
+    return "product"
+}
+```

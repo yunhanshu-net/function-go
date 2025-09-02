@@ -29,12 +29,12 @@ func (r *routerInfo) CreateTables(ctx *Context) error {
 		if err != nil {
 			logger.Errorf(ctx, "create table %+v  error: %v", table, err)
 		}
-		tabler, ok := table.(schema.Tabler)
+		_, ok := table.(schema.Tabler)
 		if !ok {
 			logger.Errorf(ctx, "create table %+v  error: %v", table, err)
 			continue
 		}
-		logger.Infof(ctx, "CreateTables create table %s success", tabler.TableName())
+		//logger.Infof(ctx, "CreateTables create table %s success", tabler.TableName())
 	}
 	return nil
 

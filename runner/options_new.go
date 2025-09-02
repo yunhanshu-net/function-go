@@ -22,6 +22,14 @@ type FunctionGroup struct {
 	// IsAtomic    bool `json:"is_atomic"`    // 是否原子组
 }
 
+type OnInputFuzzyMapper interface {
+	OnInputFuzzyMap() map[string]OnInputFuzzy
+}
+
+type OnInputValidateMapper interface {
+	OnInputValidateMap() map[string]OnInputValidate
+}
+
 // ==================== 选项接口 ====================
 
 // Option 选项接口
@@ -76,6 +84,8 @@ type BaseConfig struct {
 
 	// 自动运行
 	AutoRun bool `json:"-"`
+
+	Dependencies []string `json:"dependencies"` //依赖项
 }
 
 // ==================== 扁平化选项结构 ====================
@@ -169,17 +179,49 @@ func (opt *FormFunctionOptions) GetAutoCrudTable() interface{} {
 // 实现 FunctionInfoInterface 接口
 func (opt *FormFunctionOptions) GetOnInputFuzzyMap() map[string]interface{} {
 	result := make(map[string]interface{})
-	for k, v := range opt.OnInputFuzzyMap {
-		result[k] = v
+	if opt.Request == nil {
+		return nil
 	}
+
+	onInputFuzzyMapper, ok := opt.Request.(OnInputFuzzyMapper)
+	if ok {
+		for k, v := range onInputFuzzyMapper.OnInputFuzzyMap() {
+			result[k] = v
+		}
+	} else {
+		// 组件级回调
+		for k, v := range opt.OnInputFuzzyMap {
+			result[k] = v
+		}
+	}
+
+	//for k, v := range opt.OnInputFuzzyMap {
+	//	result[k] = v
+	//}
 	return result
 }
 
 func (opt *FormFunctionOptions) GetOnInputValidateMap() map[string]interface{} {
 	result := make(map[string]interface{})
-	for k, v := range opt.OnInputValidateMap {
-		result[k] = v
+	if opt.Request == nil {
+		return nil
 	}
+
+	onInputValidateMapper, ok := opt.Request.(OnInputValidateMapper)
+	if ok {
+		for k, v := range onInputValidateMapper.OnInputValidateMap() {
+			result[k] = v
+		}
+	} else {
+		// 组件级回调
+		for k, v := range opt.OnInputValidateMap {
+			result[k] = v
+		}
+	}
+
+	//for k, v := range opt.OnInputFuzzyMap {
+	//	result[k] = v
+	//}
 	return result
 }
 
@@ -292,13 +334,31 @@ func (opt *TableFunctionOptions) GetCallbacks() map[string]interface{} {
 		callbacks["OnPageLoad"] = opt.OnPageLoad
 	}
 
-	// 组件级回调
-	if opt.OnInputFuzzyMap != nil {
-		callbacks["OnInputFuzzyMap"] = opt.OnInputFuzzyMap
+	if opt.Request != nil {
+		onInputFuzzyMapper, ok := opt.Request.(OnInputFuzzyMapper)
+		if ok {
+			callbacks["OnInputFuzzyMap"] = onInputFuzzyMapper.OnInputFuzzyMap()
+		} else {
+			// 组件级回调
+			if opt.OnInputFuzzyMap != nil {
+				callbacks["OnInputFuzzyMap"] = opt.OnInputFuzzyMap
+			}
+		}
+
+		onInputValidateMapper, ok := opt.Request.(OnInputValidateMapper)
+		if ok {
+			callbacks["OnInputValidateMap"] = onInputValidateMapper.OnInputValidateMap()
+		} else {
+			// 组件级回调
+			if opt.OnInputFuzzyMap != nil {
+				callbacks["OnInputValidateMap"] = opt.OnInputFuzzyMap
+			}
+		}
 	}
-	if opt.OnInputValidateMap != nil {
-		callbacks["OnInputValidateMap"] = opt.OnInputValidateMap
-	}
+
+	//if opt.OnInputValidateMap != nil {
+	//	callbacks["OnInputValidateMap"] = opt.OnInputValidateMap
+	//}
 
 	// 表格专用回调
 	if opt.OnTableDeleteRows != nil {
@@ -320,16 +380,44 @@ func (opt *TableFunctionOptions) GetCallbacks() map[string]interface{} {
 // 实现 FunctionInfoInterface 接口
 func (opt *TableFunctionOptions) GetOnInputFuzzyMap() map[string]interface{} {
 	result := make(map[string]interface{})
-	for k, v := range opt.OnInputFuzzyMap {
-		result[k] = v
+	if opt.AutoCrudTable == nil {
+		return result
 	}
+
+	onInputFuzzyMapper, ok := opt.AutoCrudTable.(OnInputFuzzyMapper)
+	if ok {
+		for k, v := range onInputFuzzyMapper.OnInputFuzzyMap() {
+			result[k] = v
+		}
+	} else {
+		// 组件级回调
+		for k, v := range opt.OnInputFuzzyMap {
+			result[k] = v
+		}
+	}
+
+	//for k, v := range opt.OnInputFuzzyMap {
+	//	result[k] = v
+	//}
 	return result
 }
 
 func (opt *TableFunctionOptions) GetOnInputValidateMap() map[string]interface{} {
 	result := make(map[string]interface{})
-	for k, v := range opt.OnInputValidateMap {
-		result[k] = v
+	if opt.AutoCrudTable == nil {
+		return nil
+	}
+
+	onInputFuzzyMapper, ok := opt.AutoCrudTable.(OnInputValidateMapper)
+	if ok {
+		for k, v := range onInputFuzzyMapper.OnInputValidateMap() {
+			result[k] = v
+		}
+	} else {
+		// 组件级回调
+		for k, v := range opt.OnInputFuzzyMap {
+			result[k] = v
+		}
 	}
 	return result
 }

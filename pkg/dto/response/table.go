@@ -54,6 +54,9 @@ func (t *tableData) Build() error {
 	if t.err != nil {
 		return t.err
 	}
+	if t.val == nil {
+		return build(t.resp, t.Data, RenderTypeTable)
+	}
 	sliceVal := reflect.ValueOf(t.val)
 	if sliceVal.Kind() == reflect.Pointer {
 		sliceVal = sliceVal.Elem()
@@ -70,6 +73,10 @@ func (t *tableData) Build() error {
 	values := make(map[string][]interface{}, len(columns))
 	for i := 0; i < sliceVal.Len(); i++ {
 		row := sliceVal.Index(i)
+		// 确保row不是指针值
+		if row.Kind() == reflect.Pointer {
+			row = row.Elem()
+		}
 		for _, col := range columns {
 			field := row.Field(col.Idx) //根据idx取field
 			if _, ok := values[col.Code]; !ok {
@@ -90,8 +97,11 @@ func (t *tableData) AutoPaginated(db *gorm.DB, model interface{}, pageInfo *quer
 		pageInfo = new(query.PageInfoReq)
 	}
 
+	// 修复：在应用搜索条件之前先克隆数据库连接，避免污染原始连接
+	dbClone := db.Session(&gorm.Session{})
+
 	// 使用query库的公开方法应用搜索条件
-	dbWithConditions, err := query.ApplySearchConditions(db, pageInfo)
+	dbWithConditions, err := query.ApplySearchConditions(dbClone, pageInfo)
 	if err != nil {
 		t.err = fmt.Errorf("AutoPaginated.ApplySearchConditions failed: %v", err)
 		return t
@@ -114,7 +124,9 @@ func (t *tableData) AutoPaginated(db *gorm.DB, model interface{}, pageInfo *quer
 	}
 
 	// 查询当前页数据
-	if err := dbWithConditions.Offset(offset).Limit(pageSize).Find(t.val).Error; err != nil {
+	queryDB := dbWithConditions.Offset(offset).Limit(pageSize)
+
+	if err := queryDB.Find(t.val).Error; err != nil {
 		t.err = fmt.Errorf("AutoPaginated.Find :%+v failed to find records: %v", t.val, err)
 		return t
 	}
@@ -132,11 +144,18 @@ func (t *tableData) AutoPaginated(db *gorm.DB, model interface{}, pageInfo *quer
 		TotalPages:  totalPages,
 		PageSize:    pageSize,
 	}
+
 	return t
 }
 
 func parserTableInfo(row interface{}) []column {
 	of := reflect.TypeOf(row)
+
+	// 添加指针类型处理
+	if of.Kind() == reflect.Pointer {
+		of = of.Elem() // 获取指针指向的类型
+	}
+
 	var columns []column
 	for i := 0; i < of.NumField(); i++ {
 		field := of.Field(i)

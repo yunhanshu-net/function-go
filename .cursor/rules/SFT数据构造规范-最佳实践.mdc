@@ -1,0 +1,783 @@
+# SFT数据构造规范 - 最佳实践模板
+
+**核心理念**：高质量SFT数据 = 高质量代码生成。rag-api标签体现AI时代的文档新范式。
+
+## 🏷️ rag-api标签使用规范
+
+### 核心原则
+- **只暴露函数签名**：rag-api标签只包含函数声明，不包含函数体
+- **便于AI检索**：标签内容应该让AI能够快速理解函数用途和参数
+- **避免信息过载**：不要在标签中包含实现细节
+
+### 正确用法示例
+```go
+// ✅ 正确：只暴露函数签名
+// <rag-api>
+// 学生选课业务逻辑：多选课程计算总学分，支持重复选课检测和学分限制
+func SchoolCourseSelectBusiness(ctx *runner.Context, req *SchoolCourseSelectReq, resp response.Response) error {
+// </rag-api>
+
+// ❌ 错误：包含完整函数体
+// <rag-api>
+// 学生选课业务逻辑：多选课程计算总学分，支持重复选课检测和学分限制
+func SchoolCourseSelectBusiness(ctx *runner.Context, req *SchoolCourseSelectReq, resp response.Response) error {
+    // ... 完整的函数实现代码 ...
+    return resp.Form(result).Build()
+}
+// </rag-api>
+```
+
+### 标签位置规范
+- **开始标签**：放在函数注释和函数声明之间
+- **结束标签**：放在函数签名结束的 `{` 之后，函数体开始之前
+- **内容要求**：只包含函数注释和函数签名，不包含函数体
+
+### 暴露必要性判断标准
+
+#### 🎯 **必须暴露的情况**
+1. **表结构（Struct）**：其他模块需要连表查询时
+2. **核心工具函数**：其他模块无法替代的功能（如获取安装路径）
+3. **公共接口**：多个模块共同使用的核心业务逻辑
+
+#### ❌ **不需要暴露的情况**
+1. **内部请求/响应结构体**：只在当前模块内部使用
+2. **业务逻辑函数**：其他模块不会调用的具体业务实现
+3. **工具函数**：其他模块可以自己实现的简单功能
+4. **配置选项**：框架配置，不需要AI理解
+
+#### 🔍 **判断方法**
+在添加rag-api标签前，问自己：
+- **其他模块真的需要知道这个功能吗？**
+- **这个功能是否可以被其他模块自己实现？**
+- **暴露后是否会给AI带来噪音？**
+
+#### 💡 **最佳实践**
+- **宁可少暴露，也不要过度暴露**
+- **表结构优先暴露，函数谨慎暴露**
+- **其他模块能自己造的，绝不暴露**
+- **只有真正必要的核心功能才暴露**
+
+## 🎯 完整示例：学校管理系统（分文件设计）
+
+### Package结构说明
+
+每个package会自动生成`init_.go`文件，定义RouterGroup变量：
+```go
+// init_.go (自动生成)
+package school
+var RouterGroup = "/school"
+```
+
+### 文件1：学生管理 - school_student.go（无依赖基础模块）
+
+```go
+package school
+
+/*
+<metadata>
+<需求>学生管理：学生基础信息的增删改查，支持姓名搜索、年级筛选，为其他模块提供学生数据基础</需求>
+<文件>school_student.go</文件>
+<难度>初级 - 标准CRUD操作</难度>
+<依赖>无依赖</依赖>
+<训练点>标准table函数、数据模型设计、命名规范</训练点>
+</metadata>
+*/
+
+import (
+    "fmt"
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/pkg/dto/usercall"
+    "github.com/yunhanshu-net/function-go/runner"
+    "github.com/yunhanshu-net/pkg/query"
+    "gorm.io/gorm"
+)
+
+// ==================== 1. 数据模型 ====================
+
+// <rag-api>
+// 学生表：支持姓名搜索、年级筛选，表名school_student
+type SchoolStudent struct {
+    ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:学生ID" permission:"read"`
+    CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime:milli" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+    
+    Name      string         `json:"name" gorm:"column:name;comment:姓名" runner:"name:姓名" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+    Grade     string         `json:"grade" gorm:"column:grade;comment:年级" runner:"name:年级" widget:"type:select;options:一年级,二年级,三年级,四年级,五年级,六年级" search:"in" validate:"required"`
+    ClassName string         `json:"class_name" gorm:"column:class_name;comment:班级" runner:"name:班级" widget:"type:input;placeholder:如: 一(1)班" search:"like"`
+    Phone     string         `json:"phone" gorm:"column:phone" runner:"name:手机号" widget:"type:input" search:"like" validate:"required,len=11,numeric" msg:"手机号必须为11位数字"`
+    Status    string         `json:"status" gorm:"column:status;comment:学籍状态" runner:"name:学籍状态" widget:"type:select;options:在校生,已毕业" data:"default_value:在校生" search:"in" validate:"required"`
+}
+// </rag-api>
+
+func (SchoolStudent) TableName() string { return "school_student" }
+
+// ==================== 2. 业务逻辑 ====================
+
+type SchoolStudentListReq struct {
+    query.PageInfoReq `runner:"-"`
+}
+
+func SchoolStudentList(ctx *runner.Context, req *SchoolStudentListReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    var rows []SchoolStudent
+    return resp.Table(&rows).AutoPaginated(db, &SchoolStudent{}, &req.PageInfoReq).Build()
+}
+
+type SchoolStudentCreateReq struct {
+    Name      string `json:"name" runner:"name:姓名" widget:"type:input" validate:"required,min=2,max=50"`
+    Grade     string `json:"grade" runner:"name:年级" widget:"type:select;options:一年级,二年级,三年级,四年级,五年级,六年级" validate:"required"`
+    ClassName string `json:"class_name" runner:"name:班级" widget:"type:input;placeholder:如: 一(1)班"`
+    Phone     string `json:"phone" runner:"name:手机号" widget:"type:input" validate:"required,len=11,numeric" msg:"手机号必须为11位数字"`
+}
+
+type SchoolStudentCreateResp struct {
+    Message   string `json:"message" runner:"name:结果" widget:"type:input"`
+    StudentID int    `json:"student_id" runner:"name:学生ID" widget:"type:number"`
+}
+
+func SchoolStudentCreate(ctx *runner.Context, req *SchoolStudentCreateReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    
+    student := &SchoolStudent{
+        Name:      req.Name,
+        Grade:     req.Grade,
+        ClassName: req.ClassName,
+        Phone:     req.Phone,
+        Status:    "在校生",
+    }
+    
+    if err := db.Create(student).Error; err != nil {
+        return err
+    }
+    
+    return resp.Form(&SchoolStudentCreateResp{
+        Message:   "学生创建成功！",
+        StudentID: student.ID,
+    }).Build()
+}
+
+// ==================== 3. 框架配置 ====================
+
+var SchoolStudentGroup = &runner.FunctionGroup{CnName: "学生管理", EnName: "school_student"}
+
+var SchoolStudentListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "school_student_list",
+        ChineseName:  "学生管理-列表",
+        ApiDesc:      "学生信息列表，支持分页、搜索和筛选。",
+        Tags:         []string{"学校", "学生"},
+        Request:      &SchoolStudentListReq{},
+        Response:     query.PaginatedTable[[]SchoolStudent]{},
+        CreateTables: []interface{}{&SchoolStudent{}},
+        Group:        SchoolStudentGroup,
+    },
+    AutoCrudTable: &SchoolStudent{},
+    
+    OnInputValidateMap: map[string]runner.OnInputValidate{
+        "phone": func(ctx *runner.Context, req *usercall.OnInputValidateReq) (*usercall.OnInputValidateResp, error) {
+            phone := fmt.Sprintf("%v", req.Value)
+            
+            if len(phone) != 11 || phone[0] != '1' {
+                return &usercall.OnInputValidateResp{
+                    IsValid: false,
+                    Message: "手机号格式不正确",
+                }, nil
+            }
+            
+            db := ctx.MustGetOrInitDB()
+            var count int64
+            err := db.Model(&SchoolStudent{}).Where("phone = ?", phone).Count(&count).Error
+            if err != nil || count > 0 {
+                return &usercall.OnInputValidateResp{
+                    IsValid: false,
+                    Message: "该手机号已被注册",
+                }, nil
+            }
+            
+            return &usercall.OnInputValidateResp{IsValid: true, Message: "手机号可用"}, nil
+        },
+    },
+}
+
+var SchoolStudentCreateOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "school_student_create",
+        ChineseName:  "学生管理-新建",
+        ApiDesc:      "创建新学生，支持手机号重复性校验和业务逻辑验证。",
+        Tags:         []string{"学校", "学生", "创建"},
+        Request:      &SchoolStudentCreateReq{},
+        Response:     &SchoolStudentCreateResp{},
+        CreateTables: []interface{}{&SchoolStudent{}},
+        Group:        SchoolStudentGroup,
+    },
+    
+    OnInputValidateMap: map[string]runner.OnInputValidate{
+        "phone": func(ctx *runner.Context, req *usercall.OnInputValidateReq) (*usercall.OnInputValidateResp, error) {
+            phone := fmt.Sprintf("%v", req.Value)
+            
+            if len(phone) != 11 {
+                return &usercall.OnInputValidateResp{
+                    IsValid: false,
+                    Message: "手机号必须是11位数字",
+                }, nil
+            }
+            
+            for _, char := range phone {
+                if char < '0' || char > '9' {
+                    return &usercall.OnInputValidateResp{
+                        IsValid: false,
+                        Message: "手机号只能包含数字",
+                    }, nil
+                }
+            }
+            
+            if phone[0] != '1' {
+                return &usercall.OnInputValidateResp{
+                    IsValid: false,
+                    Message: "手机号必须以1开头",
+                }, nil
+            }
+            
+            db := ctx.MustGetOrInitDB()
+            var count int64
+            err := db.Model(&SchoolStudent{}).Where("phone = ?", phone).Count(&count).Error
+            if err != nil {
+                return &usercall.OnInputValidateResp{
+                    IsValid: false,
+                    Message: "数据库查询失败，请稍后重试",
+                }, nil
+            }
+            
+            if count > 0 {
+                return &usercall.OnInputValidateResp{
+                    IsValid: false,
+                    Message: "该手机号已被注册，请使用其他手机号",
+                }, nil
+            }
+            
+            return &usercall.OnInputValidateResp{
+                IsValid: true,
+                Message: "手机号格式正确且可用",
+            }, nil
+        },
+    },
+}
+
+func init() {
+    runner.Get(RouterGroup+"/school_student_list", SchoolStudentList, SchoolStudentListOption)
+    runner.Post(RouterGroup+"/school_student_create", SchoolStudentCreate, SchoolStudentCreateOption)
+}
+```
+
+### 文件2：学生选课系统 - school_course_select.go（依赖学生管理）
+
+```go
+package school
+
+/*
+<metadata>
+<需求>学生选课系统：学生数据从学生管理模块获取，支持多选课程、实时计算学分统计，包含数据校验和选课限制，选课成功后持久化选课记录</需求>
+<文件>school_course_select.go</文件>
+<难度>中等 - 涉及跨模块依赖、多选聚合、数据校验、事务处理</难度>
+<依赖>SchoolStudent表（来自school_student.go学生管理模块）</依赖>
+<训练点>跨文件依赖、OnInputFuzzy学生查询、多选聚合计算、业务校验、错误处理</训练点>
+</metadata>
+*/
+
+import (
+    "fmt"
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/pkg/dto/usercall"
+    "github.com/yunhanshu-net/function-go/runner"
+    "github.com/yunhanshu-net/pkg/query"
+    "gorm.io/gorm"
+)
+
+// ==================== 1. 数据模型 ====================
+
+// <rag-api>
+// 选课记录表：持久化学生选课结果，支持按学生和课程筛选，表名school_course_select
+type SchoolCourseSelect struct {
+    ID          int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:ID" permission:"read"`
+    CreatedAt   int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:选课时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    DeletedAt   gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+    
+    StudentID   int            `json:"student_id" runner:"name:学生ID" widget:"type:number" search:"eq"`
+    StudentName string         `json:"student_name" runner:"name:学生姓名" widget:"type:input" search:"like"`
+    CourseID    int            `json:"course_id" runner:"name:课程ID" widget:"type:number" search:"eq"`
+    CourseName  string         `json:"course_name" runner:"name:课程名称" widget:"type:input" search:"like"`
+    Credit      float64        `json:"credit" runner:"name:学分" widget:"type:number;precision:1"`
+    Hours       int            `json:"hours" runner:"name:学时" widget:"type:number"`
+    Remarks     string         `json:"remarks" runner:"name:备注" widget:"type:input;mode:text_area"`
+}
+// </rag-api>
+
+func (SchoolCourseSelect) TableName() string { return "school_course_select" }
+
+// ==================== 2. 业务逻辑 ====================
+
+// <rag-api>
+// 学生选课业务逻辑：多选课程计算总学分，支持重复选课检测和学分限制
+func SchoolCourseSelectBusiness(ctx *runner.Context, req *SchoolCourseSelectReq) (*SchoolCourseSelectResp, error) {
+    if req.StudentID == 0 {
+        return nil, fmt.Errorf("请选择学生；若无可选项，请先在学生管理创建学生信息。")
+    }
+    if len(req.CourseIDs) == 0 {
+        return nil, fmt.Errorf("请至少选择一门课程。")
+    }
+
+    db := ctx.MustGetOrInitDB()
+    
+    var student SchoolStudent
+    if err := db.Where("id = ?", req.StudentID).First(&student).Error; err != nil {
+        return nil, fmt.Errorf("学生不存在，请检查学号/姓名，或先在学生管理创建。")
+    }
+
+    courses := []Course{
+        {ID: 1, Name: "高等数学", Credit: 4, Hours: 64},
+        {ID: 2, Name: "大学英语", Credit: 3, Hours: 48},
+        {ID: 3, Name: "计算机基础", Credit: 2.5, Hours: 40},
+        {ID: 4, Name: "线性代数", Credit: 3, Hours: 48},
+    }
+    
+    courseMap := make(map[int]Course)
+    for _, c := range courses {
+        courseMap[c.ID] = c
+    }
+
+    var totalCredit float64
+    var totalHours int
+    selections := make([]StudentCourseSelection, 0)
+    
+    for _, courseID := range req.CourseIDs {
+        course, exists := courseMap[courseID]
+        if !exists {
+            return nil, fmt.Errorf("课程ID %d 不存在，请重新选择。", courseID)
+        }
+        
+        var existing StudentCourseSelection
+        if err := db.Where("student_id = ? AND course_id = ?", req.StudentID, courseID).First(&existing).Error; err == nil {
+            return nil, fmt.Errorf("课程 %s 已选择过，请勿重复选课。", course.Name)
+        }
+        
+        totalCredit += course.Credit
+        totalHours += course.Hours
+        
+        selections = append(selections, StudentCourseSelection{
+            StudentID:   student.ID,
+            StudentName: student.Name,
+            CourseID:    course.ID,
+            CourseName:  course.Name,
+            Credit:      course.Credit,
+            Hours:       course.Hours,
+        })
+    }
+
+    if totalCredit > 20 {
+        return nil, fmt.Errorf("总学分 %.1f 超过限制(20学分)，请减少课程选择。", totalCredit)
+    }
+
+    if err := db.Create(&selections).Error; err != nil {
+        return nil, fmt.Errorf("选课失败：%v", err)
+    }
+
+    return &SchoolCourseSelectResp{
+        Message:     fmt.Sprintf("选课成功！共选择 %d 门课程，总计 %.1f 学分", len(selections), totalCredit),
+        TotalCredit: totalCredit,
+        CourseCount: len(selections),
+    }, nil
+}
+// </rag-api>
+
+// ==================== 3. 框架配置 ====================
+
+var SchoolCourseSelectGroup = &runner.FunctionGroup{CnName: "学生选课", EnName: "school_course_select"}
+
+var SchoolCourseSelectOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "school_course_select",
+        ChineseName:  "学生选课",
+        ApiDesc:      "学生多选课程，实时展示学分统计，支持重复选课检测和学分上限控制。",
+        Tags:         []string{"学校", "选课", "学分统计"},
+        Request:      &SchoolCourseSelectReq{},
+        Response:     &SchoolCourseSelectResp{},
+        CreateTables: []interface{}{&SchoolStudent{}, &SchoolCourseSelect{}},
+        Group:        SchoolCourseSelectGroup,
+        Dependencies: []string{"school_student.go"},
+    },
+    
+    OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+        "student_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            keyword := fmt.Sprintf("%v", req.Value)
+            db := ctx.MustGetOrInitDB()
+            
+            var students []SchoolStudent
+            query := db.Where("status = ?", "在校生")
+            if keyword != "" {
+                query = query.Where("name LIKE ?", "%"+keyword+"%")
+            }
+            query.Limit(20).Find(&students)
+            
+            items := make([]*usercall.InputFuzzyItem, 0)
+            for _, s := range students {
+                items = append(items, &usercall.InputFuzzyItem{
+                    Value: s.ID,
+                    Label: fmt.Sprintf("%s (%s)", s.Name, s.Grade),
+                    DisplayInfo: map[string]interface{}{
+                        "姓名": s.Name,
+                        "年级": s.Grade,
+                        "状态": s.Status,
+                    },
+                })
+            }
+            
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{
+                    "选课规则": "每学期最多选6门课程",
+                    "学分要求": "毕业需满120学分",
+                    "选课说明": "可重复选课，按最新记录为准",
+                },
+                Values: items,
+            }, nil
+        },
+        
+        "course_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            courses := []Course{
+                {ID: 1, Name: "高等数学", Credit: 4, Hours: 64},
+                {ID: 2, Name: "大学英语", Credit: 3, Hours: 48},
+                {ID: 3, Name: "计算机基础", Credit: 2.5, Hours: 40},
+                {ID: 4, Name: "线性代数", Credit: 3, Hours: 48},
+                {ID: 5, Name: "大学物理", Credit: 3.5, Hours: 56},
+            }
+            
+            items := make([]*usercall.InputFuzzyItem, 0)
+            for _, c := range courses {
+                items = append(items, &usercall.InputFuzzyItem{
+                    Value: c.ID,
+                    Label: fmt.Sprintf("%s - %.1f学分 %d学时", c.Name, c.Credit, c.Hours),
+                    DisplayInfo: map[string]interface{}{
+                        "课程名称": c.Name,
+                        "学分":   c.Credit,
+                        "学时":   c.Hours,
+                    },
+                })
+            }
+            
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{
+                    "总学分":  "sum(学分)",
+                    "总学时":  "sum(学时)", 
+                    "课程数":  "count(学分)",
+                    "平均学分": "avg(学分)",
+                    "选课提示": "建议总学分不超过 20 学分",
+                    "选课政策": "每学期最多选择 8 门课程",
+                },
+                Values: items,
+            }, nil
+        },
+    },
+}
+
+func init() {
+    runner.Post(RouterGroup+"/school_course_select", SchoolCourseSelect, SchoolCourseSelectOption)
+}
+```
+
+## ⚠️ 关键规范强调
+
+### **1. 命名规范（严格执行）**
+
+**核心原则**：文件名作为命名前缀，确保命名不重复、易维护
+
+| 文件名 | 结构体 | 函数 | 配置 | 表名 | 路由 |
+|---|---|---|---|---|---|
+| `school_student.go` | `SchoolStudent` | `SchoolStudentList` | `SchoolStudentListOption` | `school_student` | `RouterGroup+"/school_student_list"` |
+| `school_course_select.go` | `SchoolCourseSelect` | `SchoolCourseSelectBusiness` | `SchoolCourseSelectOption` | `school_course_select` | `RouterGroup+"/school_course_select"` |
+
+**严格要求**：
+- ✅ **结构体名称**：`文件名CamelCase` （如：SchoolStudent）
+- ✅ **函数名称**：`文件名CamelCase + 动作` （如：SchoolStudentList）
+- ✅ **配置名称**：`文件名CamelCase + 动作 + Option` （如：SchoolStudentListOption）
+- ✅ **表名**：`文件名snake_case` （如：school_student）
+- ✅ **路由**：`RouterGroup + "/" + 函数EnglishName` （如：RouterGroup+"/school_student_list"）
+
+### **2. 文件拆分原则（依赖分离）**
+
+**基础无依赖模块优先**：
+- 📁 `school_student.go` - **学生管理**（无依赖，提供学生数据基础）
+- 📁 `school_course_select.go` - **学生选课系统**（依赖学生管理模块）
+
+**依赖关系体现**：
+- ✅ 被依赖的基础模型放在单独文件
+- ✅ 有依赖的业务逻辑放在单独文件  
+- ✅ metadata中明确声明依赖关系
+- ✅ BaseConfig中通过Dependencies字段声明依赖的文件名
+- ✅ 便于前端可视化展示和后端依赖解析
+
+### **3. 代码顺序标准（大模型学习优化）**
+
+**标准顺序**：概念递进，依赖有序
+```
+1. 数据模型（基础概念层）      ← 建立基础概念
+2. 业务逻辑（业务功能层）      ← 实现业务逻辑
+3. 框架配置（基础设施层）      ← 基础设施
+```
+
+**核心原理**：
+- ✅ **先定义后使用**：被依赖的类型先定义
+- ✅ **抽象到具体**：从业务概念到技术实现
+- ✅ **重要到次要**：核心功能在前，配置在后
+
+## 🏆 最佳实践要点
+
+### **1. 业务逻辑与框架解耦（核心原则）**
+- ✅ **纯业务函数**：`CourseSelectBusiness` 不依赖框架，可在任何上下文调用
+- ✅ **框架适配层**：`CourseSelect` 仅负责适配runner框架，薄薄一层
+- ✅ **完整类型暴露**：rag-api标签包含完整的参数和返回类型定义
+- ✅ **复用性强**：业务逻辑可被其他模块、测试、CLI等多种上下文复用
+
+### **2. rag-api标签规范**
+- ✅ **包含函数签名**：签名和描述一体化，便于工具提取
+- ✅ **完整类型信息**：明确说明参数结构和返回结果
+- ✅ **业务导向描述**：直接说明解决什么业务问题
+- ✅ **使用建议**：告诉调用者最佳实践和注意事项
+- ✅ **错误处理指导**：说明常见错误场景和处理方式
+
+### **3. 注释层次分明**
+- **头部元数据**：供内部工具使用，训练时会剔除
+- **代码内注释**：简洁明了，突出核心概念
+- **rag-api暴露**：完整的能力和使用指南
+
+### **4. 业务价值体现**
+- **用户导向**：错误信息指导用户具体操作
+- **场景完整**：覆盖正常流程和异常处理
+- **实用建议**：基于实际经验的最佳实践
+
+### **5. 暴露边界控制（关键原则）**
+- ✅ **价值驱动暴露**：只暴露对外有复用价值的接口，避免信息过载
+- ✅ **分层暴露策略**：业务核心层必须暴露，工具支撑层选择性暴露，内部实现层不暴露
+- ✅ **稳定性优先**：优先暴露稳定的业务抽象，避免暴露易变的实现细节
+- ✅ **维护成本考量**：每个暴露的接口都需要维护文档，确保ROI为正
+- ✅ **极简原则**：不搞包级概览，不重复描述，每个rag-api标签直接、精准、有独特价值
+
+### **6. 依赖关系处理原则（核心设计理念）**
+
+**用户洞察**：*"不要让被引用的去关心别人，而是我引用别人我需要关心他"*
+
+#### **依赖原则核心思想**
+- **🎯 职责单一**：基础表专注自身CRUD，不关心谁依赖了自己
+- **📋 依赖方负责**：业务表承担依赖管理责任，说明前置条件
+- **🔒 边界清晰**：每个模块有明确的职责边界，避免职责混乱
+- **⚡ 维护简单**：基础表注释简洁，依赖复杂度集中在业务层
+
+#### **依赖层次划分**
+```
+基础层（被依赖，注释简洁）:
+├── 学生表 ← "纯CRUD，可直接操作"
+├── 课程表 ← "基础信息管理，直接查询"  
+├── 活动表 ← "活动基础信息，直接操作"
+└── 教师表 ← "教师基础资料，直接引用"
+
+业务层（依赖基础层，承担依赖责任）:
+├── 选课记录 → 依赖学生+课程 ← "前置条件：须先注册学生和课程"
+├── 活动报名 → 依赖学生+活动 ← "前置条件：须先注册学生和活动"  
+├── 学生卡 → 依赖学生 ← "前置条件：须先在学生管理注册用户"
+└── 成绩记录 → 依赖学生+课程 ← "前置条件：须完成选课流程"
+```
+
+#### **注释模式对比**
+
+**❌ 错误模式：基础表承担过多责任**
+```go
+// 学生表：基础信息 + 删除时需要通知选课系统、活动系统、后勤系统...
+// 协调指南：删除学生时需要先删除学生卡、取消选课、取消活动报名...
+```
+
+**✅ 正确模式：依赖方承担责任**
+```go
+// 基础表（被依赖方）- 简洁明了
+// <rag-api>
+// 学生表：学生基础信息管理，纯CRUD操作，其他模块可直接查询和引用
+type SchoolStudent struct { ... }
+// </rag-api>
+
+// 业务表（依赖方）- 承担依赖责任  
+// <rag-api>
+// 学生卡表：学生一卡通管理，依赖学生基础信息
+// 【前置条件】：新增学生卡前须先在学生管理模块注册学生信息
+// 【依赖关系】：student_id 外键引用 school_student.id
+type SchoolStudentCard struct {
+    StudentID int `json:"student_id"` // 依赖学生表
+}
+// </rag-api>
+```
+
+### **7. 技术规范遵循**
+- **命名一致性**：文件名、结构体、表名、路由保持一致
+- **标签正确性**：runner标签、widget配置、search配置规范使用
+- **框架特性**：OnInputFuzzy聚合、数据校验、事务处理等
+- **依赖原则**：基础表简洁，业务表承担依赖管理责任
+
+## 🎯 暴露边界控制详解
+
+### **核心问题：避免信息噪音！**
+
+**用户反馈**：*"注释都快赶上代码了，我个人感觉很多都没必要暴露...怕在让大模型生成时候给太多信息造成噪音"*
+
+**协调式暴露原则**：默认只读暴露，同时提供写入协调指南 - **"尽可能只读，必要可协调"**。
+
+**核心理念**：
+- **🔒 默认只读**：安全第一，避免跨模块数据污染
+- **📋 协调指南**：明确告知写入操作的正确协调流程  
+- **🤝 责任明确**：各模块管好自己的数据，但提供协作方案
+- **⚡ 依赖原则**：依赖者关心被依赖者，而不是反过来
+
+### **暴露判断矩阵**
+
+| 优先级 | 类型 | 示例 | 暴露理由 | rag-api标签 |
+|---|---|---|---|---|
+| **🔥 P0** | 数据模型 | `SchoolStudent` | 其他模块基础依赖 | ✅ 必需 |
+| **🔥 P0** | 系统工具 | `videoFfmpegResolveFFmpeg()` | 系统级检查，普遍需求 | ✅ 必需 |
+| **⚡ P1** | 复杂业务 | `SchoolCourseSelectBusiness()` | 包含复杂校验，难以重复实现 | ✅ 建议 |
+| **❌ P2** | 简单工具 | `calculateCourseStats()` | 逻辑简单，注释比代码长 | ❌ 禁止 |
+| **❌ P3** | 纯CRUD | `SchoolStudentCreate()` | 直接操作表即可 | ❌ 禁止 |
+| **❌ P3** | 框架适配 | `SchoolActivityRegister()` | 框架层，不会被调用 | ❌ 禁止 |
+
+### **判断标准（精简五问法则）**
+
+暴露前必须问自己：
+
+1. **🤔 跨模块需求**：其他模块真的需要调用吗？
+2. **🔧 实现复杂度**：其他模块自己实现困难吗？（3行代码能搞定的不要暴露！）
+3. **📊 业务核心性**：这是核心业务逻辑而不是简单计算吗？
+4. **⚡ 系统级价值**：这是系统级工具还是模块内部工具？
+5. **📝 注释ROI**：rag-api注释的训练价值是否大于信息噪音？
+
+**⚠️ 新规则：至少4个"是"才考虑暴露，否则宁可不暴露！**
+
+**避免暴露的典型场景：**
+- 注释比代码长的简单函数
+- 其他模块可以3行代码自己实现的工具函数  
+- 纯粹的数据库CRUD操作
+- 只有1-2行核心逻辑的函数
+
+### **具体暴露策略**
+
+#### ✅ **应该暴露的接口**
+
+**1. 基础数据表 - 被依赖方（P0级别 - 必须暴露）**
+```go
+// ✅ 必须暴露 - 基础数据表，其他模块查询和引用基础
+// <rag-api>
+// 学生表：学生基础信息管理，纯CRUD操作，其他模块可直接查询和引用
+type SchoolStudent struct {
+    ID     int    `json:"id" gorm:"primaryKey"`
+    Name   string `json:"name" search:"like"`
+    Status string `json:"status" search:"in"`  // 在校生/已毕业/已退学
+}
+// </rag-api>
+```
+
+**2. 系统级工具（P0级别 - 必须暴露）**
+```go
+// ✅ 必须暴露 - 系统级检查，普遍需要
+// <rag-api>
+// FFmpeg环境检测：检查系统是否安装FFmpeg，返回安装路径或错误
+func videoFfmpegResolveFFmpeg(ctx *runner.Context) (installPath string, err error)
+// </rag-api>
+```
+
+**3. 复杂业务逻辑（P1级别 - 建议暴露）**
+```go
+// ✅ 应该暴露 - 包含复杂业务校验，难以重复实现
+// <rag-api>
+// 学生选课业务逻辑：多选课程计算总学分，支持重复选课检测和学分限制
+func SchoolCourseSelectBusiness(ctx *runner.Context, req *SchoolCourseSelectReq) (*SchoolCourseSelectResp, error)
+// </rag-api>
+```
+
+#### ❌ **不应该暴露的接口**
+```go
+// 框架适配层 - 只是胶水代码，无独特价值
+func CourseSelect(ctx *runner.Context, req *CourseSelectReq, resp response.Response) error {
+    result, err := CourseSelectBusiness(ctx, req)
+    if err != nil {
+        return err
+    }
+    return resp.Form(result).Build()
+}
+
+// 内部工具函数 - 实现细节，易变
+func sanitizeCourseName(name string) string {
+    return strings.TrimSpace(name)
+}
+```
+
+### **信息过载的危害**
+
+**后果**：
+- 📉 **信息稀释**：有价值的接口被大量平庸接口稀释
+- 🔍 **检索困难**：AI检索时难以找到真正有用的接口
+- 📚 **维护负担**：大量无价值文档需要维护
+- 🧠 **认知过载**：开发者难以快速识别核心接口
+
+### **渐进式暴露策略**
+
+#### **阶段1：保守暴露（推荐起点）**
+```
+原则：宁可少暴露，不可多暴露
+策略：只暴露最核心的业务函数和数据模型
+好处：确保每个暴露的接口都有高价值
+```
+
+#### **阶段2：按需扩展**
+```
+根据使用反馈调整：
+- 观察哪些内部函数被频繁跨模块调用
+- 将验证有价值的函数提升为暴露接口
+- 移除不再使用的暴露接口
+```
+
+### **暴露边界检查清单**
+
+#### **暴露前检查**
+- [ ] 函数是否有明确的业务语义？
+- [ ] 函数是否会被跨文件/跨包调用？
+- [ ] 函数的接口是否相对稳定？
+- [ ] 函数是否代表可复用的业务抽象？
+- [ ] 维护这个函数的rag-api文档ROI是否为正？
+
+## 🎯 SFT训练价值
+
+这个模板体现了：
+- **AI时代的文档新范式**：rag-api标签为AI检索增强而设计
+- **完整的业务闭环**：从数据模型到业务逻辑到前端交互
+- **经验沉淀**：每个rag-api标签都包含使用经验和最佳实践
+- **生态思维**：不仅关心功能实现，更关心如何被更好地使用
+- **边界控制**：通过暴露边界控制确保信息质量和检索效率
+
+## ⚡ 极简原则确认
+
+**最终决策：采用极简方案**
+- ❌ **拒绝包级概览**：避免信息重复和维护负担
+- ✅ **直接精准描述**：每个rag-api标签都有独特价值
+- ✅ **大道至简**：去掉废话，突出核心业务价值
+- ✅ **就近维护**：代码即文档，修改时注释就在眼前
+
+**示例：正确的极简方式**
+```go
+// <rag-api>
+// FFmpeg路径解析器：按优先级获取可用路径（DB→本地→PATH）
+func videoFfmpegResolveFFmpeg(ctx *runner.Context) (installPath string, err error)
+// </rag-api>
+
+// <rag-api>
+// 学生选课：多选课程实时计算学分，纯业务逻辑可跨模块复用
+func SchoolCourseSelectBusiness(ctx *runner.Context, req *SchoolCourseSelectReq) (*SchoolCourseSelectResp, error)
+// </rag-api>
+```
+
+**核心原则：每个rag-api标签都直接、精准、有独特价值。宁可少暴露也不要信息过载！**
+
+**用这个极简模板构造的SFT数据，将帮助AI生成更高质量、更实用的代码！** 🚀

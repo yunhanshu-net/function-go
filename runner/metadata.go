@@ -83,11 +83,12 @@ func buildRuntimeMeta(fn interface{}) (*runtimeMeta, error) {
 
 // 实际调用逻辑
 func doCall(method string, meta *runtimeMeta, ctx *Context, resp *response.RunFunctionResp, body interface{}) error {
-	req := meta.reqPool.Get()
+	req := reflect.New(meta.reqType.Elem()).Interface()
 	var err error
 
+	//req:=meta.reqPool.Get()
 	// 确保在所有错误路径上都返回对象到池中
-	defer meta.reqPool.Put(req)
+	//defer meta.reqPool.Put(req)
 
 	if body != nil {
 		if method == "GET" {

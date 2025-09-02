@@ -1,0 +1,551 @@
+# function-go Widget 标签使用规范
+
+## 核心原则
+
+widget 标签用于定义 UI 组件类型和参数，是前端自动生成界面的核心配置。
+
+### 组件使用场景
+- **请求组件**：用于表单输入，如 `input`、`number`、`select`、`file_upload` 等
+- **响应组件**：用于结果展示，如 `file_display`、`tag` 等
+- **通用组件**：既可用于输入也可用于展示，如 `slider`、`datetime` 等
+
+## 标签格式规范
+
+```go
+widget:"type:组件类型;参数1:值1;参数2:值2"
+```
+
+### 单行标签要求
+- 所有标签必须写在同一行，不能换行
+- 多个参数用分号分隔
+- 参数值使用冒号分隔
+- 参数值包含特殊字符时使用引号包围
+
+## 基础组件
+
+### 1. input 组件
+**用途**：文本输入框
+**type**：`input`
+
+#### 参数说明
+- **mode** (可选)：输入模式
+  - `line_text`：单行文本（默认）
+  - `text_area`：多行文本
+  - `password`：密码输入
+- **placeholder** (可选)：占位符文本
+- **maxlength** (可选)：最大字符数
+
+#### 示例
+```go
+// 单行文本输入
+Name string `widget:"type:input"`
+
+// 多行文本输入
+Description string `widget:"type:input;mode:text_area"`
+
+// 密码输入
+Password string `widget:"type:input;mode:password"`
+```
+
+### 2. number 组件
+**用途**：数字输入框
+**type**：`number`
+
+#### 参数说明
+- **min** (可选)：允许输入的最小值
+- **max** (可选)：允许输入的最大值
+- **step** (可选)：步进值
+- **precision** (可选)：小数位数精度（>0时自动允许小数输入）
+- **prefix** (可选)：前缀符号（如 ¥）
+- **suffix** (可选)：后缀符号
+- **unit** (可选)：单位文本
+- **placeholder** (可选)：提示文本
+
+#### 示例
+```go
+// 基础数字输入（整数）
+Age int `widget:"type:number;min:1;max:120;unit:岁"`
+
+// 小数输入（身高体重）
+Height float64 `widget:"type:number;min:100;max:250;unit:cm;precision:1"`
+
+// 价格输入
+Price float64 `widget:"type:number;min:0;precision:2;prefix:￥"`
+
+// 百分比输入
+Percentage float64 `widget:"type:number;min:0;max:100;precision:1;suffix:%"`
+
+// 精确数值（BMI结果）
+BMI float64 `widget:"type:number;precision:2"`
+```
+
+### 3. select 组件
+**用途**：下拉选择框
+**type**：`select`
+
+#### 参数说明
+- **options** (可选)：选项列表，用逗号分隔
+- **multiple** (可选)：是否多选，true/false
+- **placeholder** (可选)：占位符文本
+
+#### 示例
+```go
+// 单选下拉
+Status string `widget:"type:select;options:待处理,进行中,已完成"`
+
+// 多选下拉
+Categories []string `widget:"type:select;options:技术,产品,设计,运营;multiple:true"`
+```
+
+### 4. checkbox 组件
+**用途**：复选框（多选）
+**type**：`checkbox`
+
+#### 参数说明
+- **options** (可选)：选项列表，用逗号分隔
+- **inline** (可选)：是否内联显示，true/false
+
+#### 示例
+```go
+// 复选框多选
+Hobbies []string `widget:"type:checkbox;options:阅读,音乐,运动,旅行"`
+```
+
+### 5. radio 组件
+**用途**：单选框
+**type**：`radio`
+
+#### 参数说明
+- **options** (可选)：选项列表，用逗号分隔
+- **direction** (可选)：排列方向
+  - `horizontal`：水平排列
+  - `vertical`：垂直排列（默认）
+
+#### 示例
+```go
+// 水平排列单选框
+Gender string `widget:"type:radio;options:男,女;direction:horizontal"`
+```
+
+### 6. switch 组件
+**用途**：开关组件
+**type**：`switch`
+
+#### 参数说明
+- **true_label** (可选)：开启状态标签
+- **false_label** (可选)：关闭状态标签
+
+#### 示例
+```go
+// 基础开关
+IsActive bool `widget:"type:switch;true_label:启用;false_label:禁用"`
+```
+
+### 7. datetime 组件
+**用途**：日期时间选择器
+**type**：`datetime`
+
+#### 参数说明
+- **kind** (可选)：具体格式类型
+  - `date`：仅日期
+  - `datetime`：日期时间（默认）
+  - `time`：仅时间
+  - `daterange`：日期范围
+  - `datetimerange`：日期时间范围
+  - `month`：月份选择
+  - `year`：年份选择
+  - `week`：周选择
+- **format** (可选)：显示格式
+  - `yyyy-MM-dd`：日期格式
+  - `HH:mm`：时间格式
+  - `yyyy-MM-dd HH:mm:ss`：完整格式
+- **placeholder** (可选)：占位符文本
+- **min_date** (可选)：最小可选日期
+- **max_date** (可选)：最大可选日期
+
+#### 示例
+```go
+// 日期选择
+StartDate int64 `widget:"type:datetime;kind:date;format:yyyy-MM-dd"`
+
+// 时间选择
+MeetingTime int64 `widget:"type:datetime;kind:time;format:HH:mm"`
+
+// 日期范围
+DateRange []int64 `widget:"type:datetime;kind:daterange;format:yyyy-MM-dd"`
+```
+
+### 8. multiselect 组件
+**用途**：多选组件（支持动态数据源和自定义创建）
+**type**：`multiselect`
+
+#### 参数说明
+- **api** (可选)：API接口地址，用于动态获取选项
+- **placeholder** (可选)：占位符文本
+- **options** (可选)：静态选项列表，用逗号分隔
+- **allow_create** (可选)：是否允许用户创建新选项
+- **multiple_limit** (可选)：最多可选数量
+- **collapse_tags** (可选)：是否折叠标签显示
+
+#### 示例
+```go
+// 静态多选
+Tags []string `widget:"type:multiselect;options:紧急,重要,API,UI,数据库"`
+
+// 可创建的多选
+UserTags []string `widget:"type:multiselect;options:Java,Python,Go;allow_create:true;multiple_limit:8"`
+
+// 技能标签
+Skills []string `widget:"type:multiselect;options:前端,后端,运维,测试;allow_create:true"`
+
+// 项目成员
+Members []string `widget:"type:multiselect;options:张三,李四,王五"`
+```
+
+### 9. color 组件
+**用途**：颜色选择器（仅用于请求）
+**type**：`color`
+
+#### 参数说明
+- **format** (可选)：颜色格式，如 `hex`、`rgb`、`rgba`、`hsl`、`hsla`
+- **predefine** (可选)：预定义颜色列表
+- **show_alpha** (可选)：是否显示透明度选择器，如 `true`、`false`
+
+#### 格式与透明度支持对照表
+| 格式 | show_alpha=true | show_alpha=false | 透明度支持 | 值长度变化 |
+|------|----------------|------------------|------------|------------|
+| Hex | #409EFFFF | #409EFF | ✅ 支持 | 6位 → 8位 |
+| RGB | rgb(64, 158, 255) | rgb(64, 158, 255) | ❌ 不支持 | 无变化 |
+| RGBA | rgba(64, 158, 255, 0.8) | rgba(64, 158, 255, 1) | ✅ 支持 | alpha值变化 |
+| HSL | hsl(210, 100%, 62%) | hsl(210, 100%, 62%) | ❌ 不支持 | 无变化 |
+| HSLA | hsla(210, 100%, 62%, 0.8) | hsla(210, 100%, 62%, 1) | ✅ 支持 | alpha值变化 |
+
+#### 关键发现
+- **Hex格式**：唯一受show_alpha影响的格式，会改变值长度（6位 ↔ 8位）
+- **RGB/HSL格式**：完全不支持透明度，无论show_alpha如何设置
+- **RGBA/HSLA格式**：始终包含透明度信息，格式长度不变，只改变alpha值
+
+#### 实际应用建议
+- **不支持8位hex**：设置 `show_alpha: false`
+- **需要透明度但不支持8位hex**：使用 `format: "rgba"`
+- **支持所有格式**：使用默认配置 `show_alpha: true`
+
+#### 示例
+```go
+// 主题颜色选择（不显示透明度，避免8位hex）
+ThemeColor string `widget:"type:color;format:hex;predefine:#409EFF,#67C23A,#E6A23C,#F56C6C;show_alpha:false" data:"example:#409EFF;default_value:#409EFF"`
+
+// 品牌颜色选择（显示透明度，支持8位hex）
+BrandColor string `widget:"type:color;format:hex;show_alpha:true" data:"example:#1890FFFF;default_value:#1890FFFF"`
+
+// 背景颜色选择（使用RGBA格式，始终支持透明度）
+BackgroundColor string `widget:"type:color;format:rgba;show_alpha:true" data:"example:rgba(255,255,255,0.9);default_value:rgba(255,255,255,1)"`
+
+// 强调色选择（默认配置，支持所有格式）
+AccentColor string `widget:"type:color;format:hex;show_alpha:true" data:"example:#409EFFFF;default_value:#409EFFFF"`
+```
+
+#### 使用场景示例
+
+**场景1：基础颜色选择（避免8位hex）**
+```go
+// 用于需要严格6位hex格式的场景
+PrimaryColor string `widget:"type:color;format:hex;show_alpha:false" data:"example:#409EFF;default_value:#409EFF"`
+```
+
+**场景2：带透明度的颜色选择**
+```go
+// 用于需要透明度的场景，支持8位hex
+OverlayColor string `widget:"type:color;format:hex;show_alpha:true" data:"example:#000000FF;default_value:#000000FF"`
+```
+
+**场景3：RGBA格式（推荐用于透明度）**
+```go
+// 用于需要透明度的场景，使用RGBA格式更兼容
+BackgroundColor string `widget:"type:color;format:rgba;show_alpha:true" data:"example:rgba(255,255,255,0.9);default_value:rgba(255,255,255,1)"`
+```
+
+**场景4：HSL格式（用于色相调整）**
+```go
+// 用于调整色相的场景
+ThemeColor string `widget:"type:color;format:hsl;show_alpha:false" data:"example:hsl(210,100%,62%);default_value:hsl(210,100%,62%)"`
+```
+
+**场景5：HSLA格式（用于色相调整+透明度）**
+```go
+// 用于调整色相且需要透明度的场景
+AccentColor string `widget:"type:color;format:hsla;show_alpha:true" data:"example:hsla(210,100%,62%,0.8);default_value:hsla(210,100%,62%,1)"`
+```
+
+#### example和default_value设置指南
+
+**重要原则**：`example`和`default_value`必须与`format`和`show_alpha`设置匹配
+
+| 格式 | show_alpha | 正确的example/default_value | 错误的example/default_value |
+|------|------------|---------------------------|---------------------------|
+| hex | false | `#409EFF` | `#409EFFFF` |
+| hex | true | `#409EFFFF` | `#409EFF` |
+| rgba | true | `rgba(255,255,255,0.9)` | `rgba(255,255,255,1)` |
+| hsl | false | `hsl(210,100%,62%)` | `hsla(210,100%,62%,0.8)` |
+| hsla | true | `hsla(210,100%,62%,0.8)` | `hsl(210,100%,62%)` |
+
+**设置建议**：
+- **6位hex**：`data:"example:#409EFF;default_value:#409EFF"`
+- **8位hex**：`data:"example:#409EFFFF;default_value:#409EFFFF"`
+- **RGBA**：`data:"example:rgba(255,255,255,0.9);default_value:rgba(255,255,255,1)"`
+- **HSL**：`data:"example:hsl(210,100%,62%);default_value:hsl(210,100%,62%)"`
+- **HSLA**：`data:"example:hsla(210,100%,62%,0.8);default_value:hsla(210,100%,62%,1)"`
+
+### 10. slider 组件
+**用途**：滑块组件（支持输入和展示）
+**type**：`slider`
+
+#### 参数说明
+- **min** (可选)：最小值
+- **max** (可选)：最大值
+- **step** (可选)：步进值
+- **unit** (可选)：单位
+
+#### 示例
+```go
+// 音量滑块
+Volume int `widget:"type:slider;min:0;max:100;unit:%"`
+
+// 评分滑块
+Rating float64 `widget:"type:slider;min:1;max:5;step:0.5;unit:分"`
+
+// 进度展示
+Progress int `widget:"type:slider;min:0;max:100;unit:%"`
+```
+
+### 11. file_upload 组件
+**用途**：文件上传（仅用于请求）
+**type**：`file_upload`
+
+#### 参数说明
+- **accept** (可选)：接受的文件类型，如 `.jpg,.png,.pdf`
+- **max_size** (可选)：最大文件大小，支持带单位的格式：
+  - `10MB`、`1.5GB`、`500KB`、`1024B`
+  - 支持的单位：`B`、`KB`、`MB`、`GB`
+  - **注意**：必须使用带单位的格式，不能使用纯数字
+- **multiple** (可选)：是否允许多文件上传
+
+#### 示例
+```go
+// 单文件上传
+Avatar *files.Files `widget:"type:file_upload;accept:.jpg,.png,.gif;max_size:5MB"`
+
+// 多文件上传
+Documents *files.Files `widget:"type:file_upload;accept:.pdf,.doc,.docx;multiple:true"`
+
+// 图片上传
+ProductImages *files.Files `widget:"type:file_upload;accept:.jpg,.png,.webp;max_size:10MB;multiple:true"`
+
+// 大文件上传
+VideoFile *files.Files `widget:"type:file_upload;accept:.mp4,.avi,.mov;max_size:1.5GB"`
+
+// 小文件上传
+ConfigFile *files.Files `widget:"type:file_upload;accept:.json,.yaml,.yml;max_size:500KB"`
+```
+
+### 12. file_display 组件
+**用途**：文件展示（仅用于响应）
+**type**：`file_display`
+
+#### 示例
+```go
+// 文件展示
+Files *files.Files `widget:"type:file_display"`
+
+// 图片展示
+ProductImages *files.Files `widget:"type:file_display"`
+
+// 文档展示
+Documents *files.Files `widget:"type:file_display"`
+```
+
+### 13. list 组件
+
+**type**：`list`
+
+**说明**：用于处理动态列表数据，允许用户添加、删除、编辑列表项。
+
+**支持的数据类型**：
+- `[]string`：字符串列表
+- `[]int`：整数列表  
+- `[]float64`：浮点数列表
+- `[]bool`：布尔值列表
+- `[]struct`：结构体列表
+
+**示例**：
+
+```go
+// 字符串列表
+Steps []string `widget:"type:list"`
+
+// 数字列表
+Scores []int `widget:"type:list"`
+
+// 布尔值列表
+Flags []bool `widget:"type:list"`
+
+// 结构体列表
+Contacts []Contact `widget:"type:list"`
+```
+
+**复杂列表示例**：
+
+```go
+// 联系人结构体
+type Contact struct {
+    Name  string `json:"name" runner:"name:姓名" widget:"type:input"`
+Phone string `json:"phone" runner:"name:电话" widget:"type:input"`
+Email string `json:"email" runner:"name:邮箱" widget:"type:input"`
+}
+
+// 订单项结构体
+type OrderItem struct {
+    ProductName string  `json:"product_name" runner:"name:商品名称" widget:"type:input"`
+    Quantity    int     `json:"quantity" runner:"name:数量" widget:"type:number;min:1"`
+    UnitPrice   float64 `json:"unit_price" runner:"name:单价" widget:"type:number;min:0;precision:2"`
+    TotalPrice  float64 `json:"total_price" runner:"name:小计" widget:"type:number;precision:2"`
+}
+
+// 订单项列表 - 使用 list 组件
+OrderItems []OrderItem `json:"order_items" runner:"name:订单项" widget:"type:list" validate:"required,min=1"`
+```
+
+### 14. form 组件
+**用途**：嵌套表单
+**type**：`form`
+
+#### 示例
+```go
+// 嵌套表单
+Address struct {
+    Province string `json:"province"`
+    City     string `json:"city"`
+} `widget:"type:form"`
+```
+
+## 高级用法
+
+### 1. 条件显示
+通过 `permission` 标签控制组件显示：
+
+```go
+// 只读字段
+ID int `widget:"type:number" permission:"read"`
+
+// 仅创建时显示
+SecretKey string `widget:"type:input;mode:password" permission:"create"`
+
+// 仅编辑时显示
+EditNote string `widget:"type:input;mode:text_area" permission:"update"`
+```
+
+### 2. 搜索配置（仅table函数）
+table 函数中的搜索配置：
+
+```go
+// 模糊搜索
+Name string `search:"like"`
+
+// 精确搜索
+Status string `search:"eq"`
+
+// 否定搜索
+Description string `search:"not_like,not_eq"`
+
+// 区间搜索
+Price float64 `search:"eq,gt,gte,lt,lte"`
+
+// 多选搜索
+Category string `search:"eq,in"`
+
+// 否定多选搜索
+Tags string `search:"not_eq,not_in"`
+```
+
+### 3. 验证规则
+通过 `validate` 标签进行输入验证：
+
+```go
+// 必填验证
+Name string `validate:"required"`
+
+// 长度验证
+Description string `validate:"required,min=10,max=500"`
+
+// 数值范围验证
+Age int `validate:"required,min=1,max=120"`
+
+// 枚举值验证
+Status string `validate:"required,oneof=待处理 进行中 已完成"`
+
+// 邮箱格式验证
+Email string `validate:"required,email"`
+```
+
+## 最佳实践
+
+### 1. 组件选择原则
+- **文本输入**：使用 `input`
+- **数字输入**：使用 `number`
+- **选择输入**：使用 `select`、`radio`、`checkbox`
+- **日期时间**：使用 `datetime`
+- **文件处理**：使用 `file_upload`、`file_display`
+- **多选场景**：使用 `multiselect`
+
+### 2. 参数设置原则
+- **min/max**：设置合理的数值范围
+- **precision**：价格等金额字段使用2位小数
+- **unit**：添加单位提高可读性
+
+### 3. 验证规则原则
+- **required**：必填字段必须验证
+- **长度限制**：防止过长输入
+- **格式验证**：邮箱、URL等特殊格式
+- **业务规则**：符合实际业务需求
+
+### 4. 搜索配置原则（search标签，仅table函数）
+- **文本字段**：使用 `like` 模糊搜索，`eq` 精确搜索，`not_like` 否定模糊搜索，`not_eq` 否定精确搜索
+- **状态字段**：使用 `eq` 精确搜索，`not_eq` 否定精确搜索
+- **数值字段**：使用 `eq` 等值搜索，`gt,gte,lt,lte` 区间搜索，`not_eq` 否定搜索
+- **分类字段**：使用 `eq` 等值搜索，`in` 多选搜索，`not_eq` 否定等值搜索，`not_in` 否定多选搜索
+
+## 常见错误
+
+### 1. 标签格式错误
+```go
+// ❌ 错误：标签换行
+widget:"type:input;
+    placeholder:请输入姓名"
+
+// ✅ 正确：单行标签
+widget:"type:input"
+```
+
+### 2. 参数值错误
+```go
+// ❌ 错误：参数值格式错误
+widget:"type:select;options:选项1 选项2 选项3"
+
+// ✅ 正确：用逗号分隔
+widget:"type:select;options:选项1,选项2,选项3"
+```
+
+### 3. 类型不匹配
+```go
+// ❌ 错误：bool类型使用input组件
+IsActive bool `widget:"type:input"`
+
+// ✅ 正确：bool类型使用switch组件
+IsActive bool `widget:"type:switch"`
+```
+
+这个文档提供了完整的 widget 标签使用指南，帮助开发者正确配置各种UI组件。
+description:
+globs:
+alwaysApply: false
+---

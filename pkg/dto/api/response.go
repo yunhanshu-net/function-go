@@ -42,7 +42,7 @@ func NewUnifiedFormResponse(el interface{}, renderType string) (*UnifiedAPIRespo
 }
 
 // NewUnifiedTableResponse 创建统一的表格响应
-func NewUnifiedTableResponse(el interface{}) (*UnifiedAPIResponse, error) {
+func NewUnifiedTableResponse(el interface{}, functionInfo FunctionInfoInterface) (*UnifiedAPIResponse, error) {
 	typeOf := reflect.TypeOf(el)
 
 	// 处理指针类型
@@ -73,6 +73,7 @@ func NewUnifiedTableResponse(el interface{}) (*UnifiedAPIResponse, error) {
 	}
 
 	builder := NewFormBuilder()
+	builder.functionInfo = functionInfo
 	tableConfig, err := builder.BuildTableConfig(itemsType)
 	if err != nil {
 		return nil, err
@@ -84,13 +85,13 @@ func NewUnifiedTableResponse(el interface{}) (*UnifiedAPIResponse, error) {
 	}, nil
 }
 
-func NewResponseParams(el interface{}, renderType string) (interface{}, error) {
+func NewResponseParams(el interface{}, renderType string, functionInfo FunctionInfoInterface) (interface{}, error) {
 	renderType = stringsx.DefaultString(renderType, response.RenderTypeForm)
 	switch renderType {
 	case response.RenderTypeForm:
 		return NewUnifiedFormResponse(el, renderType)
 	case response.RenderTypeTable:
-		return NewUnifiedTableResponse(el)
+		return NewUnifiedTableResponse(el, functionInfo)
 	default:
 		return NewUnifiedFormResponse(el, renderType)
 	}

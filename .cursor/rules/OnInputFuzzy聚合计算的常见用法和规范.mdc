@@ -1,0 +1,987 @@
+---
+description: OnInputFuzzy回调中Statistics聚合计算的使用规范和常见场景，包含正确用法和禁止示例
+globs:
+alwaysApply: true
+---
+
+# OnInputFuzzy聚合计算使用规范
+
+## 🎯 核心概念
+
+**Statistics**：在OnInputFuzzy回调中提供**前端实时聚合计算**和信息展示的功能。
+
+**工作原理**：
+- 用户在前端选择商品时，前端实时计算并展示统计信息
+- **关键**：聚合计算基于**用户当前选择的数据**，不是后端数据库的全量统计
+- 例如：用户选择3个商品，`count(价格)`显示3，不是数据库中所有商品数量
+- 帮助用户在填写表单过程中实时了解选择结果
+
+**前端聚合 vs 后端统计**：
+- **前端聚合**：`count(价格)` = 用户选择的商品数量（实时变化）
+- **后端统计**：需要后端查询数据库并返回统计结果（相对固定）
+- **单选场景**：前端聚合永远是1，毫无意义；应使用静态信息
+
+**关键原则**：
+- **有数组才聚合**：只有List内字段/多选场景才做真正的聚合计算
+- **无数组只展示**：单选/Form内场景只返回有用的静态信息
+- **用户价值导向**：每个统计信息都要对用户有实际价值
+- **信息精简**：3-5个重要信息即可，避免信息过载
+
+**判断标准**：
+
+| 组件类型 | 数据结构 | 用户选择 | 聚合计算 | 原因说明 |
+|---|---|---|---|---|
+| `list` 内的 `select` | `int/string` | 可添加多行 | ✅ 可以聚合 | 用户可以选择多个项目 |
+| `multiselect` | `[]int/[]string` | 可选择多个 | ✅ 可以聚合 | 相当于List功能 |
+| `select` | `int/string` | 只能选择一个 | ❌ 不能聚合 | 聚合结果永远是1 |
+
+## ✅ 正确使用场景
+
+### 1. List组件场景 - 真正聚合计算（最佳实践）
+
+**参考示例**：`simple_cashier_system.go` 中的完整收银台系统
+
+```go
+// ================ 完整的数据结构定义 ================
+
+// SimpleCashierProductQuantity 商品数量结构体
+type SimpleCashierProductQuantity struct {
+    ProductID int `json:"product_id" runner:"name:商品" widget:"type:select" validate:"required"`
+    Quantity  int `json:"quantity" runner:"name:数量" widget:"type:number;min:1" data:"example:1;default_value:1" validate:"required,min=1"`
+}
+
+// SimpleCashierCartItem 购物车商品
+type SimpleCashierCartItem struct {
+    ProductID   int     `json:"product_id" runner:"name:商品ID" widget:"type:number"`
+    ProductName string  `json:"product_name" runner:"name:商品名称" widget:"type:input"`
+    Price       float64 `json:"price" runner:"name:单价" widget:"type:number;precision:2"`
+    Quantity    int     `json:"quantity" runner:"name:数量" widget:"type:number;min:1"`
+    TotalPrice  float64 `json:"total_price" runner:"name:小计" widget:"type:number;precision:2"`
+}
+
+// SimpleCashierDeskReq 简化收银台请求
+type SimpleCashierDeskReq struct {
+    // 商品数量列表（只需要商品ID和数量）
+    ProductQuantities []SimpleCashierProductQuantity `json:"product_quantities" runner:"name:商品清单" widget:"type:list"`
+    // 会员卡选择
+    MemberId int `json:"member_id" runner:"name:会员卡" widget:"type:select"`
+    // 备注信息
+    Remarks string `json:"remarks" runner:"name:备注" widget:"type:input;mode:text_area"`
+}
+
+// SimpleCashierDeskResp 简化收银台响应
+type SimpleCashierDeskResp struct {
+    // 支付结果 - 放在第一位，用户第一时间看到
+    PaymentResult string `json:"payment_result" runner:"name:支付结果" widget:"type:input;mode:text_area"`
+    // 订单信息
+    OrderNumber string `json:"order_number" runner:"name:订单号" widget:"type:input"`
+    // 价格信息 - 重要信息放前面
+    TotalAmount    float64 `json:"total_amount" runner:"name:商品总额" widget:"type:number;precision:2"`
+    DiscountAmount float64 `json:"discount_amount" runner:"name:折扣金额" widget:"type:number;precision:2"`
+    FinalAmount    float64 `json:"final_amount" runner:"name:实付金额" widget:"type:number;precision:2"`
+    // 商品清单
+    ProductList []SimpleCashierCartItem `json:"product_list" runner:"name:商品清单" widget:"type:list"`
+    // 会员信息 - 详细信息放最后
+    MemberInfo *SimpleCashierMemberCard `json:"member_info" runner:"name:会员信息" widget:"type:form"`
+}
+
+// ================ 完整的处理函数 ================
+
+// SimpleCashierDesk 简化收银台处理函数
+func SimpleCashierDesk(ctx *runner.Context, req *SimpleCashierDeskReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+
+    // 1. 验证会员卡
+    if req.MemberId == 0 {
+        return resp.Form(&SimpleCashierDeskResp{
+            PaymentResult: "请选择会员卡",
+        }).Build()
+    }
+
+    var member SimpleCashierMemberCard
+    if err := db.Where("id = ?", req.MemberId).First(&member).Error; err != nil {
+        return resp.Form(&SimpleCashierDeskResp{
+            PaymentResult: "会员卡不存在",
+        }).Build()
+    }
+
+    // 2. 验证商品清单
+    if len(req.ProductQuantities) == 0 {
+        return resp.Form(&SimpleCashierDeskResp{
+            PaymentResult: "请选择商品",
+        }).Build()
+    }
+
+    // 3. 获取商品信息并验证
+    var totalAmount float64
+    productList := make([]SimpleCashierCartItem, 0)
+
+    for _, pq := range req.ProductQuantities {
+        var product SimpleCashierProduct
+        if err := db.Where("id = ?", pq.ProductID).First(&product).Error; err != nil {
+            return resp.Form(&SimpleCashierDeskResp{
+                PaymentResult: fmt.Sprintf("商品ID %d 不存在", pq.ProductID),
+            }).Build()
+        }
+
+        // 检查库存
+        if product.Stock < pq.Quantity {
+            return resp.Form(&SimpleCashierDeskResp{
+                PaymentResult: fmt.Sprintf("商品 %s 库存不足，需要 %d，库存 %d", product.Name, pq.Quantity, product.Stock),
+            }).Build()
+        }
+
+        // 计算小计
+        itemTotal := SimpleCashierRoundMoney(product.Price * float64(pq.Quantity))
+        item := SimpleCashierCartItem{
+            ProductID:   pq.ProductID,
+            ProductName: product.Name,
+            Price:       product.Price,
+            Quantity:    pq.Quantity,
+            TotalPrice:  itemTotal,
+        }
+        productList = append(productList, item)
+        totalAmount += itemTotal
+    }
+
+    // 4. 计算会员折扣（9折）
+    discountAmount := SimpleCashierRoundMoney(totalAmount * 0.1)
+    finalAmount := SimpleCashierRoundMoney(totalAmount - discountAmount)
+
+    // 5. 检查余额
+    if member.Balance < finalAmount {
+        return resp.Form(&SimpleCashierDeskResp{
+            PaymentResult: fmt.Sprintf("余额不足，需要¥%.2f，余额¥%.2f", finalAmount, member.Balance),
+        }).Build()
+    }
+
+    // 6. 处理支付（事务处理）
+    var orderNumber string
+    err := db.Transaction(func(tx *gorm.DB) error {
+        // 生成订单号
+        orderNumber = fmt.Sprintf("ORD%s%d", time.Now().Format("20060102"), time.Now().UnixNano())
+        
+        // 创建订单、订单明细、扣减余额、更新库存、记录操作日志
+        // ... 完整的事务处理逻辑
+        
+        return nil
+    })
+
+    if err != nil {
+        return resp.Form(&SimpleCashierDeskResp{
+            PaymentResult: "支付失败: " + err.Error(),
+        }).Build()
+    }
+
+    return resp.Form(&SimpleCashierDeskResp{
+        OrderNumber:    orderNumber,
+        ProductList:    productList,
+        TotalAmount:    totalAmount,
+        DiscountAmount: discountAmount,
+        FinalAmount:    finalAmount,
+        MemberInfo:     &member,
+        PaymentResult:  "支付成功！",
+    }).Build()
+}
+
+// ================ 完整的函数配置 ================
+
+// SimpleCashierDeskOption 简化收银台配置
+var SimpleCashierDeskOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "simple_cashier_desk",
+        ChineseName:  "简化收银台",
+        ApiDesc:      "商品搜索选择、数量输入、会员卡支付一体化收银系统",
+        Tags:         []string{"收银系统", "商品管理", "会员服务"},
+        Request:      &SimpleCashierDeskReq{},
+        Response:     &SimpleCashierDeskResp{},
+        CreateTables: []interface{}{&SimpleCashierProduct{}, &SimpleCashierMemberCard{}, &SimpleCashierOrder{}, &SimpleCashierOrderItem{}, &SimpleCashierMemberOperationRecord{}},
+        
+        Group:        SimpleCashierGroup,
+    },
+
+    // ================ 完整的OnInputFuzzy回调 ================
+    OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+        "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            keyword := fmt.Sprintf("%v", req.Value)
+            var products []SimpleCashierProduct
+
+            db := ctx.MustGetOrInitDB()
+            db.Where("name LIKE ? OR code LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
+                Where("status = ?", "上架").
+                Where("stock > ?", 0).
+                Limit(20).
+                Find(&products)
+
+            items := make([]*usercall.InputFuzzyItem, 0)
+            for _, p := range products {
+                items = append(items, &usercall.InputFuzzyItem{
+                    Value: p.ID,
+                    Label: fmt.Sprintf("%s - ¥%.2f (库存:%d)", p.Name, p.Price, p.Stock),
+                    DisplayInfo: map[string]interface{}{
+                        "商品名称": p.Name,
+                        "价格":   p.Price,
+                        "库存":   p.Stock,
+                    },
+                })
+            }
+
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{
+                    // ✅ 前端实时聚合计算 - 用户每添加一行商品，前端立即计算
+                    "商品原价(元)": "sum(价格,*quantity)",      // 用户选择的所有商品总价
+                    "会员价格(元)": "sum(价格,*quantity,*0.9)",  // 会员9折后的总价
+                    "优惠金额(元)": "sum(价格,*quantity,*0.1)",  // 节省的金额
+                    "商品种类": "count(价格)",                  // 选了几种商品
+                    "商品总数": "sum(quantity)",               // 商品总数量
+                    
+                    // ✅ 有用的静态信息
+                    "会员折扣": "9折优惠",
+                    "配送说明": "满99元包邮",
+                },
+                Values: items,
+            }, nil
+        },
+
+        "member_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            keyword := fmt.Sprintf("%v", req.Value)
+            var members []SimpleCashierMemberCard
+
+            db := ctx.MustGetOrInitDB()
+            db.Where("card_number LIKE ? OR phone LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
+                Where("status = ?", "正常").
+                Limit(10).
+                Find(&members)
+
+            items := make([]*usercall.InputFuzzyItem, 0)
+            for _, m := range members {
+                items = append(items, &usercall.InputFuzzyItem{
+                    Value: m.ID,
+                    Label: fmt.Sprintf("%s - %s (余额:¥%.2f)", m.CardNumber, m.CustomerName, m.Balance),
+                    DisplayInfo: map[string]interface{}{
+                        "卡号":   m.CardNumber,
+                        "客户姓名": m.CustomerName,
+                        "余额":   m.Balance,
+                    },
+                })
+            }
+
+            return &usercall.OnInputFuzzyResp{Values: items}, nil
+        },
+    },
+}
+
+// ================ API注册 ================
+func init() {
+    runner.Post("/form_table_example/simple_cashier_desk", SimpleCashierDesk, SimpleCashierDeskOption)
+}
+
+// 用户体验：
+// 1. 用户添加：苹果 × 2个 → 前端显示：商品原价: ¥17.00, 会员价格: ¥15.30
+// 2. 用户再添加：香蕉 × 3个 → 前端实时更新：商品原价: ¥37.40, 会员价格: ¥33.66
+// 3. 用户实时看到购物车总价变化，帮助决策
+// 4. 选择会员卡后，系统验证余额是否充足
+// 5. 点击支付，系统完成：创建订单→扣减库存→扣减余额→记录操作日志
+```
+
+### 2. 多选场景 - 真正聚合计算
+
+**为什么可以聚合**：`multiselect` 组件允许用户选择多个商品，前端聚合计算有实际意义
+
+```go
+// 用户可以多选商品
+type MultiProductReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"` // 多选！用户可以选择多个商品
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 对用户有价值的聚合计算
+                "选中商品数": "count(价格)",           // 选了几个商品
+                "选中商品总价": "sum(价格,*quantity)", // 总价格
+                "最低单价": "min(价格)",              // 选中商品中最便宜的
+                "平均单价": "avg(价格)",              // 选中商品平均价格
+                
+                // ✅ 静态信息
+                "会员折扣": "9折优惠",
+            },
+        }, nil
+    },
+}
+```
+
+### 3. 单选场景 - 静态信息展示
+
+**为什么不能聚合**：`select` 组件只能选择一个商品，聚合计算永远是1，毫无意义
+
+```go
+// 用户只能选择一个商品
+type ProductSelectReq struct {
+    ProductID int `json:"product_id" widget:"type:select"` // 单选！用户只能选择一个商品
+    Quantity  int `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 有价值的静态信息（不是聚合）
+                "配送方式": "顺丰快递",
+                "保质期": "12个月",
+                "退换政策": "7天无理由退换",
+                "客服电话": "400-123-4567",
+            },
+        }, nil
+    },
+}
+```
+
+### 4. 非List多选场景 - 真正聚合计算
+
+**为什么可以聚合**：`multiselect` 组件允许多选，相当于List功能，聚合计算有实际意义
+
+```go
+// 最外层多选商品
+type AggregationDemoMultiSelectReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"` // 多选！用户可以选择多个商品
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 多选聚合计算
+                "选中商品总价": "sum(价格,*quantity)",
+                "商品种类数": "count(价格)",
+                "最低单价": "min(价格)",
+                "最高单价": "max(价格)",
+                
+                // ✅ 静态信息
+                "批发优惠": "满10件8折",
+                "配送说明": "全国包邮",
+            },
+        }, nil
+    },
+}
+```
+
+### 5. Form内嵌套场景 - 动态信息返回
+
+**为什么不能聚合**：Form内的单选字段，用户只能选择一个选项，聚合无意义，只能返回动态信息
+
+```go
+// Form内嵌套选择 - 游戏配置示例
+type AggregationDemoStructSingleSelectReq struct {
+    GameConfig AggregationDemoStructSingleSelectConfig `json:"game_config" widget:"type:form"`
+    ConfigBonus int `json:"config_bonus" widget:"type:number"`
+}
+
+type AggregationDemoStructSingleSelectConfig struct {
+    Theme      string `json:"theme" widget:"type:select"`      // 单选！只能选一个主题
+    Language   string `json:"language" widget:"type:select"`   // 单选！只能选一个语言
+    Difficulty string `json:"difficulty" widget:"type:select"` // 单选！只能选一个难度
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "theme": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 有用的动态信息
+                "主题特色": "科幻风格界面",
+                "兼容性": "支持所有设备",
+                "推荐指数": "★★★★★",
+            },
+        }, nil
+    },
+    "language": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 语言相关信息
+                "语言包大小": "15MB",
+                "支持语音": "是",
+                "更新频率": "每月更新",
+            },
+        }, nil
+    },
+}
+```
+
+### 6. Form内嵌套多选场景 - 真正聚合计算
+
+**为什么可以聚合**：Form内的多选字段，用户可以选择多个选项，聚合计算有实际意义
+
+```go
+// Form内嵌套多选 - 用户偏好配置
+type AggregationDemoStructMultiSelectReq struct {
+    UserProfile AggregationDemoStructMultiSelectProfile `json:"user_profile" widget:"type:form"`
+    ProfileScore int `json:"profile_score" widget:"type:number"`
+}
+
+type AggregationDemoStructMultiSelectProfile struct {
+    Relationship        []string `json:"relationship" widget:"type:multiselect"`        // 多选！可以选择多个关系类型
+    Preferences         []string `json:"preferences" widget:"type:multiselect"`         // 多选！可以选择多个偏好
+    RecommendedProducts []int    `json:"recommended_products" widget:"type:multiselect"` // 多选！可以选择多个推荐商品
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "relationship": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 关系类型聚合
+                "选择数量": "count(关系类型)",
+                "推荐活动": "根据关系推荐相应活动",
+                "优惠政策": "多选享更多优惠",
+            },
+        }, nil
+    },
+    "recommended_products": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 商品推荐聚合
+                "推荐商品数": "count(价格)",
+                "总价值": "sum(价格)",
+                "平均价格": "avg(价格)",
+                "价格区间": "min(价格) - max(价格)",
+                
+                // ✅ 静态信息
+                "推荐理由": "基于用户画像智能推荐",
+            },
+        }, nil
+    },
+}
+```
+
+### 7. List组件多选场景 - 真正聚合计算
+
+**为什么可以聚合**：List组件内的多选字段，用户可以添加多行且每行可以多选，双重聚合计算
+
+```go
+// List组件多选 - 批量商品选择
+type AggregationDemoListMultiSelectReq struct {
+    MultiSelectItems []AggregationDemoProductMultiSelect `json:"multi_select_items" widget:"type:list"` // List！用户可以添加多行
+    Remarks string `json:"remarks" widget:"type:input;mode:text_area"`
+}
+
+type AggregationDemoProductMultiSelect struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"` // 多选！每行可以选择多个商品
+    Quantity   int   `json:"quantity" widget:"type:number" data:"default_value:1"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ List内多选聚合计算
+                "选中商品数": "count(价格)",
+                "批量总价": "sum(价格,*quantity)",
+                "批量总重": "sum(重量,*quantity)",
+                "价格区间": "min(价格) - max(价格)",
+                
+                // ✅ 静态信息
+                "批发优惠": "满50件享8折",
+                "配送说明": "批量订单包邮",
+            },
+        }, nil
+    },
+}
+```
+
+### 8. 条件展示场景 - 基于搜索的动态信息
+
+**为什么不能聚合**：基于搜索关键词的单选字段，聚合无意义，只能返回动态信息
+
+```go
+// 条件展示 - 基于搜索关键词的信息展示
+type ConditionalDisplayReq struct {
+    ProductSearch string `json:"product_search" widget:"type:select"` // 单选！基于搜索的选择
+    Category      string `json:"category" widget:"type:select"`       // 单选！分类选择
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_search": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        keyword := fmt.Sprintf("%v", req.Value)
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 基于搜索关键词的动态信息
+                "搜索关键词": keyword,
+                "匹配商品数": "根据关键词匹配到的商品数量",
+                "推荐分类": "根据搜索推荐的分类",
+                "热门程度": "该关键词的搜索热度",
+                
+                // ✅ 静态业务信息
+                "搜索建议": "可尝试相关关键词",
+                "客服热线": "400-123-4567",
+            },
+        }, nil
+    },
+}
+```
+
+## ❌ 禁止的错误用法
+
+### 🚫 错误1：单选场景强行聚合
+
+```go
+// ❌ 错误示例：单选商品却显示聚合统计
+type WrongSingleSelectReq struct {
+    ProductID int `json:"product_id" widget:"type:select"`  // 只能选一个商品
+    Quantity  int `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ❌ 前端聚合计算毫无意义
+                "商品总数": "count(价格)",      // 永远显示1，用户会误以为系统只有1个商品
+                "最低价格": "min(价格)",       // 永远是用户选的商品价格，毫无参考价值
+                "最高价格": "max(价格)",       // 永远是用户选的商品价格，毫无参考价值
+                "平均价格": "avg(价格)",       // 永远是用户选的商品价格，毫无参考价值
+            },
+        }, nil
+    },
+}
+
+// 用户体验问题：
+// 用户选择"苹果 ¥8.5" → 前端显示：商品总数: 1, 最低价格: ¥8.5, 最高价格: ¥8.5, 平均价格: ¥8.5
+// 用户困惑：系统就这一个商品吗？为什么最低最高平均都一样？这些信息完全没有价值！
+
+// ✅ 正确做法：提供有用的静态信息
+type CorrectSingleSelectReq struct {
+    ProductID int `json:"product_id" widget:"type:select"`  // 只能选一个商品
+    Quantity  int `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "配送方式": "顺丰快递",
+                "保质期": "12个月", 
+                "会员折扣": "9折优惠",
+            },
+        }, nil
+    },
+}
+```
+
+### 🚫 错误2：试图获取表单其他字段值
+
+```go
+// ❌ 错误示例：回调执行时无法获取表单其他字段
+type WrongFieldAccessReq struct {
+    ProductIDs []int  `json:"product_ids" widget:"type:multiselect"`
+    OrderType  string `json:"order_type" widget:"type:select"`     // 其他表单字段
+    UserLevel  string `json:"user_level" widget:"type:select"`     // 其他表单字段
+    Quantity   int    `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ❌ 回调执行时用户还没填写表单，获取不到其他字段
+        orderType := getOrderTypeFromForm() // 不存在的函数！
+        userLevel := getUserLevel()         // 获取不到！
+        
+        // ❌ 基于不存在的数据做条件判断
+        if orderType == "批发" {
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{
+                    "批发优惠": "满100件8折",
+                },
+            }, nil
+        }
+        
+        return nil, nil
+    },
+}
+
+// ✅ 正确：只能返回静态信息或基于搜索关键词的信息
+type CorrectFieldAccessReq struct {
+    ProductIDs []int  `json:"product_ids" widget:"type:multiselect"`
+    OrderType  string `json:"order_type" widget:"type:select"`
+    UserLevel  string `json:"user_level" widget:"type:select"`
+    Quantity   int    `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        keyword := fmt.Sprintf("%v", req.Value)
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "批发优惠": "满100件8折",  // 静态业务规则
+                "零售优惠": "满99元包邮", // 静态业务规则
+                "搜索关键词": keyword,   // 可以显示搜索关键词
+            },
+        }, nil
+    },
+}
+```
+
+### 🚫 错误3：信息过载
+
+```go
+// ❌ 错误示例：信息太多，用户看不过来
+type WrongOverloadReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ❌ 信息过载，用户根本看不过来
+                "商品总数": "count(价格)",
+                "最低价格": "min(价格)",
+                "最高价格": "max(价格)",
+                "平均价格": "avg(价格)",
+                "价格总和": "sum(价格)",
+                "总重量": "sum(重量)",
+                "平均重量": "avg(重量)",
+                "最轻重量": "min(重量)",
+                "最重重量": "max(重量)",
+                "总库存": "sum(库存)",
+                "平均库存": "avg(库存)",
+                "最低库存": "min(库存)",
+                "最高库存": "max(库存)",
+                "配送方式": "顺丰快递",
+                "保质期": "12个月",
+                "客服电话": "400-123-4567",
+                "营业时间": "9:00-22:00",
+                "退换政策": "7天无理由退换",
+                "积分政策": "消费1元得1积分",
+                // ... 还有更多，用户根本看不完
+            },
+        }, nil
+    },
+}
+
+// ✅ 正确：精选3-5个最重要的信息
+type CorrectConciseReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "选中商品总价": "sum(价格,*quantity)",
+                "会员折扣": "9折优惠",
+                "配送方式": "顺丰快递",
+                "满减活动": "满100减10",
+            },
+        }, nil
+    },
+}
+```
+
+### 🚫 错误4：无意义的技术炫技
+
+```go
+// ❌ 错误示例：为了展示聚合函数而强行使用
+type WrongTechShowOffReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ❌ 为了技术炫技而强行使用复杂功能
+                "价格方差": "variance(价格)",        // 不支持且无意义
+                "价格标准差": "stddev(价格)",        // 不支持且无意义
+                "中位数": "median(价格)",            // 不支持且无意义
+                "复杂公式": "sum(价格,*quantity,*0.9,*1.1,*0.8)", // 过于复杂，用户看不懂
+                "高级统计": "percentile(价格,95)",   // 不支持的函数
+            },
+        }, nil
+    },
+}
+
+// ✅ 正确：简单有用的信息
+type CorrectSimpleReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "会员折扣": "9折优惠",
+                "满减活动": "满100减10",
+                "配送说明": "全国包邮",
+            },
+        }, nil
+    },
+}
+```
+
+### 🚫 错误5：不支持的条件聚合
+
+```go
+// ❌ 错误示例：使用不支持的if条件
+type WrongConditionalReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ❌ 不支持if条件语法
+                "水果数量": "count(价格, if(分类=='水果',1,0))", // ❌ 不支持if条件
+                "贵商品数": "count(价格, if(价格>10,1,0))",   // ❌ 不支持if条件
+                "折扣商品": "sum(价格, if(价格>50,0.8,1))",  // ❌ 不支持if条件
+            },
+        }, nil
+    },
+}
+
+// ✅ 正确：使用支持的聚合函数
+type CorrectAggregationReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "选中商品数": "count(价格)",
+                "商品总价": "sum(价格,*quantity)",
+                "平均价格": "avg(价格)",
+                "最低价格": "min(价格)",
+                "最高价格": "max(价格)",
+            },
+        }, nil
+    },
+}
+```
+
+## 📋 支持的聚合函数
+
+### 基础聚合函数
+- `sum(字段名)` - 求和
+- `avg(字段名)` - 平均值
+- `min(字段名)` - 最小值
+- `max(字段名)` - 最大值
+- `count(字段名)` - 计数
+
+### 乘法运算
+- `sum(字段名,*变量名)` - 字段值乘以变量后求和
+- `sum(字段名,*变量名,*系数)` - 字段值乘以变量和系数后求和
+
+### 动态文本聚合函数 ⭐ 新功能
+- `text(字段名)` - 动态展示选中item的文本信息，支持前端交互
+
+**重要**：变量来自当前请求结构体的同级字段，不是DisplayInfo中的字段。
+
+### 静态信息
+直接使用字符串值，不需要聚合函数：
+```go
+"会员折扣": "9折优惠",
+"配送说明": "全国包邮",
+```
+
+## 🎯 判断标准
+
+**使用Statistics前问自己**：
+1. 用户看到这个统计信息后，能帮助他做出更好的决策吗？
+2. 这个信息对当前的业务场景有实际价值吗？
+3. 信息数量是否适中（3-5个）？
+
+**记住**：Statistics要么提供有价值的聚合计算，要么提供有用的业务信息，绝不为了技术展示而强行使用。
+
+## 🆕 text() 聚合函数详解
+
+### 🎯 核心价值
+`text()` 函数解决了传统聚合函数的局限性，让前端能够动态展示选中item的详细信息，实现真正的交互式数据展示。
+
+### 🔧 工作原理
+- **触发时机**：用户选择某个item后
+- **数据来源**：基于用户当前选择的数据
+- **展示方式**：前端动态渲染，支持实时更新
+- **交互体验**：用户选择不同item，显示不同信息
+
+### 📝 使用场景
+
+#### 1. 患者问诊号选择场景
+```go
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "registration_number": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ... 查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 传统聚合：数量统计
+                "找到记录": fmt.Sprintf("%d 条", len(items)),
+                
+                // 🆕 text() 聚合：动态展示选中患者信息
+                "患者姓名": "text(患者姓名)",
+                "就诊次数": "text(就诊次数)",
+                "上次就诊": "text(上次就诊时间)",
+                "上次医嘱": "text(上次医嘱记录)",
+                "挂号备注": "text(挂号备注)",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+#### 2. 商品选择场景
+```go
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ... 查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ✅ 传统聚合：价格计算
+                "商品总价": "sum(单价,*quantity)",
+                "药品种类": "count(单价)",
+                
+                // 🆕 text() 聚合：动态展示选中商品详情
+                "商品名称": "text(商品名称)",
+                "规格信息": "text(规格)",
+                "生产厂家": "text(生产厂家)",
+                "库存状态": "text(库存状态)",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+### 💡 设计优势
+
+#### 1. **动态信息展示**
+- 用户选择不同item，显示不同信息
+- 比静态Statistics更有价值
+- 支持复杂的数据关联展示
+
+#### 2. **用户体验提升**
+- 实时反馈选中item的详细信息
+- 减少用户额外查询操作
+- 提供上下文相关的信息
+
+#### 3. **业务逻辑增强**
+- 可以展示关联数据（如患者就诊历史）
+- 支持条件化信息展示
+- 实现真正的智能提示
+
+### ⚠️ 使用注意事项
+
+#### 1. **字段对应关系**
+- `text(字段名)` 中的字段名必须与DisplayInfo中的key完全一致
+- 前端会根据这个对应关系动态展示信息
+
+#### 2. **性能考虑**
+- 避免在DisplayInfo中放置过多数据
+- 优先展示用户最需要的信息
+- 复杂关联查询考虑缓存策略
+
+#### 3. **信息一致性**
+- 确保DisplayInfo中的数据与text()聚合结果一致
+- 避免信息冲突或误导用户
+
+### 🏆 最佳实践
+
+#### 1. **组合使用策略**
+```go
+Statistics: map[string]interface{}{
+    // 传统聚合：数量、金额等统计
+    "找到记录": fmt.Sprintf("%d 条", len(items)),
+    "商品总价": "sum(单价,*quantity)",
+    
+    // text() 聚合：选中item的详细信息
+    "患者姓名": "text(患者姓名)",
+    "就诊历史": "text(就诊次数)",
+    "医嘱记录": "text(上次医嘱)",
+}
+```
+
+#### 2. **信息层次设计**
+- **第一层**：传统聚合（数量、金额等）
+- **第二层**：text() 聚合（选中item的关键信息）
+- **第三层**：DisplayInfo（完整的详细信息）
+
+#### 3. **业务场景适配**
+- **问诊场景**：患者信息、就诊历史、医嘱记录
+- **商品场景**：商品详情、库存状态、价格信息
+- **用户场景**：用户信息、权限状态、操作记录
+
+## 🏆 最佳实践参考
+
+**推荐学习**：`simple_cashier_system.go` - 简化收银系统
+
+这个文件是聚合计算功能的最佳实践示例，完美展现了：
+
+### ✅ 优秀的设计特点
+
+1. **List组件聚合计算**：
+   - 用户添加多行商品时，前端实时计算总价、折扣价、优惠金额
+   - 每个统计信息都对收银员有实际价值
+
+2. **信息精简且实用**：
+   - 只显示5个核心统计：原价、会员价、优惠金额、商品种类、商品总数
+   - 避免了信息过载，用户一目了然
+
+3. **静态信息有价值**：
+   - "会员折扣": "9折优惠" - 明确的折扣说明
+   - "配送说明": "满99元包邮" - 实用的业务规则
+
+4. **前端实时体验**：
+   - 用户每次添加商品，前端立即更新所有统计数据
+   - 帮助收银员和顾客实时了解购买情况
+
+### 📚 学习要点
+
+- **业务场景驱动**：所有聚合信息都服务于收银场景
+- **用户价值优先**：每个统计都能帮助用户做决策
+- **技术服务业务**：聚合计算完美支撑了收银业务流程
+
+**建议**：在实现类似功能时，参考这个收银系统的设计思路和信息选择原则。
+
+## 🚀 新功能展望
+
+### text() 聚合函数的应用前景
+
+#### 1. **医疗场景**
+- 患者选择：动态展示就诊历史、过敏史、用药记录
+- 医生选择：显示专业特长、出诊时间、联系方式
+- 药品选择：展示规格、用法、注意事项
+
+#### 2. **电商场景**
+- 商品选择：动态展示库存、价格、评价、规格
+- 用户选择：显示会员等级、消费记录、偏好分析
+- 订单选择：展示物流状态、支付信息、商品详情
+
+#### 3. **企业场景**
+- 员工选择：显示部门、职位、联系方式、工作状态
+- 客户选择：展示合作历史、信用等级、联系记录
+- 项目选择：显示进度、负责人、预算、风险等级
+
+### 🔮 技术发展方向
+
+#### 1. **智能推荐**
+- 基于用户选择历史，动态推荐相关信息
+- 实现真正的上下文感知信息展示
+
+#### 2. **数据关联**
+- 支持跨表数据关联展示
+- 实现复杂业务逻辑的信息聚合
+
+#### 3. **用户体验**
+- 减少用户操作步骤
+- 提供更智能、更个性化的信息展示

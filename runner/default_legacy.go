@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/yunhanshu-net/function-go/pkg/dto/api"
 	"github.com/yunhanshu-net/pkg/logger"
-	"github.com/yunhanshu-net/pkg/x/jsonx"
 	"gorm.io/gorm/schema"
 )
 
@@ -39,15 +38,15 @@ func (r *Runner) buildApiInfoFromFunctionOptions(worker *routerInfo, config *Fun
 
 	if config.Response != nil {
 		// 获取响应参数信息
-		responseParams, err := api.NewResponseParams(config.Response, config.RenderType)
+		responseParams, err := api.NewResponseParams(config.Response, config.RenderType, config)
 		if err != nil {
 			return nil, err
 		}
 		apiInfo.ParamsOut = responseParams
 	}
 
-	logger.Infof(context.Background(), "worker %s AutoUpdateConfig ==nil:%v config: %v el:%+v ",
-		worker.Router, config.AutoUpdateConfig == nil, jsonx.String(config), config)
+	//logger.Infof(context.Background(), "worker %s AutoUpdateConfig ==nil:%v config: %v el:%+v ",
+	//	worker.Router, config.AutoUpdateConfig == nil, jsonx.String(config), config)
 
 	// 处理配置相关
 	if config.AutoUpdateConfig != nil {
@@ -103,4 +102,4 @@ func (r *Runner) buildApiInfoFromFunctionOptions(worker *routerInfo, config *Fun
 	apiInfo.Callbacks = getCallbacks(config)
 
 	return apiInfo, nil
-} 
+}

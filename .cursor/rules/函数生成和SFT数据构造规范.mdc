@@ -1,0 +1,216 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+1. 首先一定要严格按function-go照框架来生成代码，可以用github的开源库，但是对于我们的的function-go框架不得自造武功，例如使用ctx.Now()这种明显我们框架不存在的API
+
+2. 需要在代码中加上详细的注释强化大模型记忆框架的功能，在关键逻辑处说明为啥要这么做
+ps：
+
+3，返回友好的提示信息
+
+4，代码一定要符合逻辑，功能一定要自洽，例如我做个学生排课系统，却没有学生表，无法搜索学生，这是明显逻辑不能自洽，符合逻辑是
+
+
+我现在想写个规范，但是我目前可能想的不够全面，你能帮我补充一下吗？我们按照训练大模型的标准来写这个文档，首先我们生成的文件中我觉得需要包含几个方面，
+
+1头部注释，
+给我们开发人员打标用的
+
+主要是元数据，方便我们打标，例如包含用户需求描述，包含场景，包含当前文件名称，包含这个文件的引用关系，例如当前文件引用了当前package的哪个文件？（用来区分是否可以独立fork，无引用关系可以独立fork，这个后续在option里也会加上一个字段来标识依赖关系）
+
+2 代码中的注释，
+训练大模型时候这个注释信息是辅助大模型来理解代码和强化记忆某些功能的
+例如：
+在定义某个函数时候，上方加上注释说明，文件名称是xxx，函数名称需要用xxx保证符合规范，防止和其他文件发生命名冲突
+
+再用到某个回调时候，强调一下这个回调的用法，为啥这里要用聚合计算，是因为用户需要在模糊查询时候显示的item能显示出当前item的排队信息
+
+特别是在OnInputFuzzyMap中，必须明确标注为哪个请求结构体的哪个字段提供数据：
+```go
+// 【框架说明】OnInputFuzzyMap 为请求结构体字段提供模糊搜索数据
+// 触发时机：用户输入时    数据去向：挂载到对应的请求字段
+var SchoolCourseSelectOption = &runner.FormFunctionOptions{
+    OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+        "student_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            // 【当前场景】student_id是非list内单选字段，只返回静态信息，不做聚合计算
+            // 【目标字段】为 SchoolCourseSelectReq.StudentID 提供学生选择数据
+            keyword := fmt.Sprintf("%v", req.Value)
+            // ... 查询逻辑（内部用什么表不重要）
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{"选课规则": "每学期最多选6门课程"},
+                Values: items,  // 用户选择后会挂载到 SchoolCourseSelectReq.StudentID
+            }, nil
+        },
+        "course_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            // 【当前场景】course_ids是多选字段，支持聚合统计计算  
+            // 【目标字段】为 SchoolCourseSelectReq.CourseIDs 提供课程多选数据
+            // ... 查询逻辑
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{"总学分": "sum(学分)"},
+                Values: items,  // 用户选择后会挂载到 SchoolCourseSelectReq.CourseIDs
+            }, nil
+        },
+    },
+}
+```
+
+这样大模型训练时能清楚学到：请求结构体 → 字段名 → 回调逻辑 → 数据挂载的完整流程
+
+OnInputFuzzyMap注释标准（三层注释）：
+1. 【框架说明】：说明OnInputFuzzyMap的基本作用和数据流向
+2. 【当前场景】：说明当前字段的类型特征（单选/多选，是否聚合）
+3. 【目标字段】：明确说明为哪个请求结构体的哪个字段提供数据
+
+OnInputValidate字段级业务校验（重要功能）：
+OnInputValidate提供实时字段校验能力，用于复杂业务规则验证：
+```go
+// 【框架说明】OnInputValidate 为表单字段提供实时业务校验
+// 触发时机：用户输入完成时    校验范围：业务逻辑、数据重复性、格式合规性
+OnInputValidateMap: map[string]runner.OnInputValidate{
+    "phone": func(ctx *runner.Context, req *usercall.OnInputValidateReq) (*usercall.OnInputValidateResp, error) {
+        // 【当前场景】phone字段需要校验手机号格式和唯一性
+        // 【目标字段】校验 SchoolStudentCreateReq.Phone 是否符合业务规则
+        phone := fmt.Sprintf("%v", req.Value)
+        
+        // 【业务校验】格式验证 + 唯一性检查
+        if len(phone) != 11 {
+            return &usercall.OnInputValidateResp{
+                IsValid: false,
+                Message: "手机号必须是11位数字",
+            }, nil
+        }
+        
+        // 数据库重复性检查
+        db := ctx.MustGetOrInitDB()
+        var count int64
+        err := db.Model(&SchoolStudent{}).Where("phone = ?", phone).Count(&count).Error
+        if err != nil || count > 0 {
+            return &usercall.OnInputValidateResp{
+                IsValid: false,
+                Message: "该手机号已被注册，请使用其他手机号",
+            }, nil
+        }
+        
+        return &usercall.OnInputValidateResp{IsValid: true, Message: "手机号可用"}, nil
+    },
+}
+```
+
+OnInputValidate应用场景：
+- 用户名/邮箱/手机号唯一性检查
+- 复杂格式验证（身份证、银行卡等）
+- 业务规则校验（库存、权限等）
+- 实时数据联动校验（关联表查询）
+
+AutoCrudTable自动CRUD功能（重要特性）：
+Table函数配置 AutoCrudTable: &SchoolStudent{} 后，框架自动提供完整CRUD：
+```go
+var SchoolStudentListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{...},
+    AutoCrudTable: &SchoolStudent{},  // 【关键配置】自动CRUD
+    
+    // 【框架特性】OnInputValidate会自动应用到CRUD操作中
+    OnInputValidateMap: map[string]runner.OnInputValidate{
+        "phone": func(...) { /* 手机号校验逻辑 */ },
+    },
+}
+```
+
+AutoCrudTable vs 手动Form函数选择：
+- 【管理端场景】：使用AutoCrudTable，数据模型直接作为请求参数，自动生成增删改查界面
+- 【用户端场景】：手动编写Form函数，自定义请求响应结构，面向最终用户优化体验
+- 【复杂业务】：手动Form函数，需要复杂的业务逻辑处理和数据转换
+
+AutoCrudTable功能清单：
+✅ 自动新增：SchoolStudent作为请求参数，前端自动生成表单
+✅ 自动编辑：基于ID的编辑功能，字段级权限控制
+✅ 自动删除：软删除支持，数据安全保证
+✅ 自动校验：OnInputValidate自动应用到所有CRUD操作
+✅ 权限控制：permission标签自动生效（read/create/update）
+
+rag-api注释避免信息重复原则：
+❌ 错误：函数注释重复参数和返回值类型
+```go
+// 参数：SchoolCourseSelectReq{StudentID int, CourseIDs []int}  ← 函数签名已说明，重复啰嗦
+// 返回：SchoolCourseSelectResp{Message string}  ← 函数签名已说明，重复啰嗦
+func BusinessFunc(req *SchoolCourseSelectReq) (*SchoolCourseSelectResp, error) {
+```
+
+✅ 正确：专注于业务价值和使用指导
+```go
+// 学生选课业务逻辑：多选课程计算总学分，支持重复选课检测和学分限制
+// 错误处理：返回具体错误信息指导用户操作
+// 使用建议：纯业务逻辑，可在任何上下文中调用
+func BusinessFunc(req *SchoolCourseSelectReq) (*SchoolCourseSelectResp, error) {
+```
+
+信息分层原则：
+- 结构体rag-api：完整的字段定义和配置信息
+- 函数rag-api：业务逻辑、错误处理、使用建议
+- 避免跨层信息重复，保持各层信息独特价值
+
+3.尾部注释，
+
+这个一般是用来当做rag来用的，
+例如：
+我当前模块是学生管理，我新增一个学生选课函数时，这时候我考虑到这个需要用到学生管理的功能时候，我会考虑用到学生管理的文件内容来当做rag知识对学生选课进行知识补充（我在想是把学生管理整个注入还是把尾部注释注入即可？），当注入了这些知识后在再做选课时候，大模型就知道了，已经存在这个功能了，我可以直接接着他来用，那我们可以通过 OnInputFuzzy 来模糊查询学生管理数据来保证用户选课时候可以搜到用户，无需再做学生管理了
+
+例如我给一个尾部注释的示例，
+
+school_student.go 目前已经有一个学生管理的功能，可以对SchoolStudent进行数据库查询来搜索用户
+```go
+
+type SchoolStudent struct {
+	ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:学生ID" permission:"read"`
+	CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime:milli" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+
+	Name      string `json:"name" gorm:"column:name;comment:姓名" runner:"name:姓名" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+	Gender    string `json:"gender" gorm:"column:gender;comment:性别" runner:"name:性别" widget:"type:select;options:男,女" search:"in" validate:"required,oneof=男 女"`
+	Grade     string `json:"grade" gorm:"column:grade;comment:年级" runner:"name:年级" widget:"type:select;options:一年级,二年级,三年级,四年级,五年级,六年级,初一,初二,初三,高一,高二,高三" search:"in" validate:"required"`
+	ClassName string `json:"class_name" gorm:"column:class_name;comment:班级" runner:"name:班级" widget:"type:input;placeholder:如: 一(1)班" search:"like"`
+	Admission int64  `json:"admission" gorm:"column:admission;comment:入学日期(毫秒)" runner:"name:入学日期" widget:"type:datetime;kind:date;format:yyyy-MM-dd" search:"gte,lte"`
+	Status    string `json:"status" gorm:"column:status;comment:学籍状态" runner:"name:学籍状态" widget:"type:select;options:在校生,已毕业;placeholder:请选择学籍状态" data:"default_value:在校生" search:"in" validate:"required,oneof=在校生 已毕业"`
+}
+
+func (SchoolStudent) TableName() string { return "school_student" }
+
+
+```
+
+当然也可以暴露一些函数？例如我的video工具里需要ffmpeg管理，这个里面可能不止是有crud这么简单，可能还要下载/上传后，这个函数做了什么
+举例：
+当前 video_ffmpeg_manage.go 里面存在VideoFfmpegManage数据库模型，主要是管理和存储当前项目管理的FFmpeg实例，我们当前video_ffmpeg_manage函数会处理整个ffmpeg的安装卸载等等整个生命周期，
+
+// VideoFfmpegManage FFmpeg 管理记录
+type VideoFfmpegManage struct {
+	ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:ID" permission:"read"`
+	CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+
+	Name   string       `json:"name" gorm:"column:name;comment:名称(展示)" runner:"name:名称(展示)" widget:"type:input"`
+	Source string       `json:"source" gorm:"column:source;comment:来源" runner:"name:来源" widget:"type:select;options:上传,外链"`
+	URL    string       `json:"url" gorm:"column:url;comment:外链(可选)" runner:"name:外链(可选)" widget:"type:input"`
+	File   *files.Files `json:"file" gorm:"type:json;comment:二进制" runner:"name:ffmpeg二进制(上传)" widget:"type:file_upload;accept:;multiple:false;max_size:500MB"`
+
+	Path        string `json:"path" gorm:"column:path;comment:安装路径" runner:"name:安装路径" widget:"type:input" permission:"read"`
+	Arch        string `json:"arch" gorm:"column:arch;comment:架构(arm64/x86_64等)" runner:"name:架构" widget:"type:input" permission:"read"`
+
+	Installed   bool   `json:"installed" gorm:"column:installed;comment:是否已安装" runner:"name:已安装" widget:"type:switch" permission:"read"`
+}
+
+
+
+可以直接调用videoFfmpegManageResolveFFmpeg 来获取ffmpeg的安装路径，即可使用
+
+// videoFfmpegManageResolveFFmpeg 解析可用的 ffmpeg 路径：优先 DB 已安装 → 本地 .ffmpeg/bin → PATH
+func videoFfmpegManageResolveFFmpeg(ctx *runner.Context) (ffmpegInstallPath string, err error)
+
+甚至VideoFfmpegManage这茬不提也可以，最简单的如果别的函数无需在乎这张表我们只需要简单的说一下我们现在已经存在
+func videoFfmpegManageResolveFFmpeg(ctx *runner.Context) (ffmpegInstallPath string, err error)
+这个函数了，可以从这里获取ffmpegInstallPath，无需自己实现，可以直接调用即可
+

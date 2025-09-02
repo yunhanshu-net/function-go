@@ -1,0 +1,1943 @@
+# function-go - AI原生全栈开发框架
+
+> **专为大模型设计的Go全栈开发框架**  
+> 🤖 AI原生结构体标签系统 | 🚀 一个文件 = 一个完整Web应用 | 🎯 大模型生成代码直接编译部署 | ⚡ 框架内部有运行入口，专注业务函数
+
+## 🔄 最新变更说明
+
+> **EnglishName字段已移除**：框架自动生成路由路径，减少配置负担
+
+
+## 目录
+
+- [1. 框架概述](#1-框架概述)
+- [2. 快速开始](#2-快速开始) 
+- [3. 核心概念](#3-核心概念)
+- [4. 组件系统](#4-组件系统)
+- [5. 回调机制](#5-回调机制)
+- [6. 完整示例](#6-完整示例)
+- [7. 最佳实践](#7-最佳实践)
+- [8. 常见问题](#8-常见问题)
+
+---
+
+## 1. 框架概述
+
+function-go是一个**Go语言AI原生全栈开发框架**，专为大模型生成可直接运行的Web应用而设计。
+
+### 1.1 核心特性
+
+#### 📁 一文件一应用
+- 一个Go文件 = 一个完整的Web应用
+- 包含数据模型、API接口、业务逻辑、自动UI生成
+- 支持独立部署和Fork复用
+
+#### 🎨 结构体即组件
+- 通过结构体标签自动生成前端UI
+- 支持20+种组件类型（input、select、datetime等）
+- 自动表单验证和数据绑定
+
+#### 🗄️ 自动建表和ORM
+- CreateTables配置自动建表
+- 完整的GORM数据库操作能力
+- 支持多租户物理隔离
+
+#### 🔄 智能回调系统
+- OnInputFuzzy: 输入联想和聚合计算
+- OnInputValidate: 实时字段验证
+- OnTableAddRows/UpdateRows/DeleteRows: 表格操作回调
+
+### 1.2 适用场景
+
+- **管理后台系统**：CRM、ERP、OA等企业应用
+- **数据处理工具**：文件转换、图片处理、数据分析
+- **业务表单系统**：工单、订单、审批流程
+- **原型快速开发**：MVP验证、功能演示
+
+### 1.3 架构设计
+
+```
+前端Web界面 ←→ function-go框架 ←→ 数据库
+     ↑              ↑              ↑
+  自动生成UI      Go结构体标签    自动建表
+```
+
+---
+
+## 2. 快速开始
+
+### 2.1 最简示例：字符串反转
+
+创建一个基础的form函数：
+
+```go
+package demo
+
+import (
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/runner"
+)
+
+// 请求结构体 - 定义表单字段
+type ReverseReq struct {
+    Text string `json:"text" runner:"name:待反转内容" widget:"type:input" data:"example:hello" validate:"required"`
+}
+
+// 响应结构体 - 定义结果展示
+type ReverseResp struct {
+    Result string `json:"result" runner:"name:反转结果" widget:"type:input;mode:text_area"`
+}
+
+// 业务处理函数
+func ReverseHandler(ctx *runner.Context, req *ReverseReq, resp response.Response) error {
+    // 字符串反转逻辑
+    reversed := reverseString(req.Text)
+    return resp.Form(&ReverseResp{
+        Result: reversed,
+    }).Build()
+}
+
+// 工具函数
+func reverseString(s string) string {
+    runes := []rune(s)
+    for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+        runes[i], runes[j] = runes[j], runes[i]
+    }
+    return string(runes)
+}
+
+// API配置和注册
+var ReverseOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        ChineseName: "字符串反转演示", 
+        ApiDesc:     "输入内容，返回其反转结果",
+        Tags:        []string{"文本处理", "字符串工具"},
+        Request:     &ReverseReq{},
+        Response:    &ReverseResp{},
+    },
+}
+
+func init() {
+	//RouterGroup 是脚手架在构建时候自动创建的变量，每个函数文件都可以直接用RouterGroup，是一定会有这个变量的，必定会有
+	runner.Post(RouterGroup+"/reverse", ReverseHandler, ReverseOption)
+}
+```
+
+### 2.2 最简Crud table函数：图书管理
+
+```go
+
+package library
+
+import (
+	"fmt"
+	"github.com/yunhanshu-net/function-go/pkg/dto/response"
+	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
+	"github.com/yunhanshu-net/function-go/runner"
+	"github.com/yunhanshu-net/pkg/query"
+	"gorm.io/gorm"
+)
+
+// 数据模型 - 自动建表
+type LibraryBook struct {
+	ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:ID" permission:"read"`
+	CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+
+	Title  string  `json:"title" runner:"name:书名" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+	Author string  `json:"author" runner:"name:作者" widget:"type:input" search:"like" validate:"required,min=2,max=20"`
+	Price  float64 `json:"price" runner:"name:价格" widget:"type:number;min:0;precision:2;prefix:￥" search:"gte,lte" validate:"required,min=0"`
+	Stock  int     `json:"stock" runner:"name:库存" widget:"type:number;min:0;unit:本" search:"gte,lte" validate:"required,min=0"`
+	Status string  `json:"status" runner:"name:状态" widget:"type:select;options:热销,预售,已售罄" data:"default_value:热销" search:"in" validate:"required"`
+}
+
+func (LibraryBook) TableName() string { return "library_book" }
+
+// 请求结构体
+type LibraryBookListReq struct {
+	query.PageInfoReq `runner:"-"`
+}
+
+// 查询处理函数
+func LibraryBookList(ctx *runner.Context, req *LibraryBookListReq, resp response.Response) error {
+	db := ctx.MustGetOrInitDB()
+	var rows []LibraryBook
+	return resp.Table(&rows).AutoPaginated(db, &LibraryBook{}, &req.PageInfoReq).Build()
+}
+
+// API配置 - 统一使用回调，体现一等公民地位
+var LibraryBookListOption = &runner.TableFunctionOptions{
+	BaseConfig: runner.BaseConfig{
+		ChineseName:  "图书列表",
+		ApiDesc:      "图书管理，支持增删改查、业务验证和状态管理",
+		Tags:         []string{"图书管理", "库存管理"},
+		Request:      &LibraryBookListReq{},
+		Response:     query.PaginatedTable[[]LibraryBook]{},
+		CreateTables: []interface{}{&LibraryBook{}},
+	},
+
+	// 【框架规范】前端新增记录时候会触发这个回调
+	OnTableAddRows: func(ctx *runner.Context, req *usercall.OnTableAddRowsReq) (*usercall.OnTableAddRowsResp, error) {
+		var books []LibraryBook
+		if err := req.DecodeBy(&books); err != nil {
+			return nil, fmt.Errorf("参数解析失败: %v", err)
+		}
+
+		db := ctx.MustGetOrInitDB()
+		// ✅ 正确做法：批量查询，避免N+1问题
+		// 收集所有书名
+		titles := make([]string, 0, len(books))
+		for _, book := range books {
+			titles = append(titles, book.Title)
+		}
+		// 一次性查询所有重复的书名
+		var existingTitles []string
+		if err := db.Model(&LibraryBook{}).
+			Where("title IN ?", titles).
+			Pluck("title", &existingTitles).Error; err != nil {
+			return nil, fmt.Errorf("检查书名重复失败: %v", err)
+		}
+
+		// 检查是否有重复
+		if len(existingTitles) > 0 {
+			return nil, fmt.Errorf("以下书名已存在：%v，请使用其他书名", existingTitles)
+		}
+
+		// 手动执行创建
+		if err := db.Create(&books).Error; err != nil {
+			return nil, fmt.Errorf("创建图书失败: %v", err)
+		}
+
+		return &usercall.OnTableAddRowsResp{}, nil
+	},
+
+	//【框架规范】前端更新记录时候会触发这个回调
+	OnTableUpdateRows: func(ctx *runner.Context, req *usercall.OnTableUpdateRowsReq) (*usercall.OnTableUpdateRowsResp, error) {
+		db := ctx.MustGetOrInitDB()
+
+		var updatedBook LibraryBook
+		err := req.DecodeBy(&updatedBook) //假如用户更新了author字段的话，那么只有这个有值，其他都是空值
+		if err != nil {
+			return nil, fmt.Errorf("解析字段失败: %v", err)
+		}
+		// 6. 用下面的方法更新也是ok的
+		//updateFields := req.GetFieldsMap() 也可以这样来获取更新字段的key 和value，这里返回map[string]interface
+
+		// 手动执行更新
+		if err := db.Where("id IN ?", req.Ids).Updates(updatedBook).Error; err != nil {
+			return nil, fmt.Errorf("更新图书失败: %v", err)
+		}
+
+		return &usercall.OnTableUpdateRowsResp{}, nil
+	},
+
+	//【框架规范】前端删除记录时候触发这个回调
+	OnTableDeleteRows: func(ctx *runner.Context, req *usercall.OnTableDeleteRowsReq) (*usercall.OnTableDeleteRowsResp, error) {
+		db := ctx.MustGetOrInitDB()
+
+		// 手动执行删除
+		if err := db.Where("id IN ?", req.Ids).Delete(&LibraryBook{}).Error; err != nil {
+			return nil, fmt.Errorf("删除图书失败: %v", err)
+		}
+
+		return &usercall.OnTableDeleteRowsResp{}, nil
+	},
+}
+
+func init() {
+	//这个函数前端会自动渲染出增删改查的功能
+	runner.Get(RouterGroup+"/library_book_list", LibraryBookList, LibraryBookListOption)
+}
+
+
+```
+
+---
+
+## 3. 核心概念
+
+### 3.1 函数类型
+
+#### Form函数
+- **用途**：处理表单提交，用于数据输入和处理
+- **HTTP方法**：POST
+- **响应类型**：resp.Form()
+- **典型场景**：数据转换、计算、文件处理
+
+#### Table函数
+- **用途**：展示列表数据，支持分页、搜索、排序
+- **HTTP方法**：GET  
+- **响应类型**：resp.Table()
+- **典型场景**：数据管理、CRUD操作
+
+### 3.2 标签系统
+
+#### runner标签
+用于定义字段的基础属性：
+
+```go
+// 基础格式
+runner:"name:显示名称"
+
+// 示例
+Title string `runner:"name:标题"`
+```
+
+#### widget标签
+用于定义UI组件类型和参数：
+
+```go
+// 基础格式
+widget:"type:组件类型;参数1:值1;参数2:值2"
+
+// 示例
+Age int `widget:"type:number;min:1;max:120;unit:岁"`
+```
+
+#### data标签
+用于定义示例值和默认值：
+
+```go
+// 示例和默认值
+data:"example:示例值;default_value:默认值"
+
+// 变量默认值（使用$前缀）
+data:"default_value:$now"  // 当前时间
+```
+
+#### validate标签
+用于定义验证规则：
+
+```go
+validate:"required,min=2,max=50"
+```
+
+#### search标签
+用于定义搜索方式（仅table函数）：
+
+```go
+search:"like"      // 模糊搜索
+search:"gte,lte"   // 区间搜索  
+search:"in"        // 多选搜索
+```
+
+#### permission标签
+用于控制字段权限（仅table函数）：
+
+```go
+permission:"read"           // 仅列表显示
+permission:"create"         // 仅新增显示
+permission:"update"         // 仅编辑显示
+permission:"create,update"  // 新增和编辑显示
+```
+
+### 3.3 命名规范
+
+#### 文件和结构体命名
+```
+文件名：snake_case（如：crm_ticket.go）
+结构体：PascalCase + 前缀（如：CrmTicket）
+表名：snake_case（如：crm_ticket）
+函数：PascalCase + 前缀（如：CrmTicketList）
+```
+
+#### API路由命名
+```
+路由路径：RouterGroup+/函数名（如：RouterGroup+"/crm_ticket_list"）
+注意：路由路径会自动根据函数名生成，无需手动指定EnglishName字段
+```
+
+#### 重要变更说明
+```
+EnglishName字段已移除：框架自动生成路由路径，减少配置负担
+```
+
+---
+
+## 4. 组件系统
+
+### 4.1 基础输入组件
+
+#### input组件
+文本输入框，支持多种模式：
+
+```go
+// 单行文本
+Name string `widget:"type:input"`
+
+// 多行文本
+Description string `widget:"type:input;mode:text_area"`
+
+// 密码输入
+Password string `widget:"type:input;mode:password"`
+```
+
+#### number组件
+数字输入框，支持精度和范围控制：
+
+```go
+// 整数输入
+Age int `widget:"type:number;min:1;max:120;unit:岁"`
+
+// 小数输入
+Price float64 `widget:"type:number;min:0;precision:2;prefix:￥"`
+
+// 百分比
+Rate float64 `widget:"type:number;min:0;max:100;precision:1;suffix:%"`
+```
+
+#### select组件
+下拉选择框：
+
+```go
+// 单选
+Status string `widget:"type:select;options:待处理,进行中,已完成"`
+
+// 多选
+Categories []string `widget:"type:select;options:技术,产品,设计;multiple:true"`
+```
+
+### 4.2 高级组件
+
+#### datetime组件
+日期时间选择器：
+
+```go
+// 日期选择
+StartDate int64 `widget:"type:datetime;kind:date;format:yyyy-MM-dd"`
+
+// 时间选择
+MeetingTime int64 `widget:"type:datetime;kind:time;format:HH:mm"`
+
+// 日期时间
+CreatedAt int64 `widget:"type:datetime;kind:datetime"`
+
+// 日期范围
+DateRange []int64 `widget:"type:datetime;kind:daterange;format:yyyy-MM-dd"`
+```
+
+#### multiselect组件
+多选组件，支持动态数据和自定义创建：
+
+```go
+// 静态多选
+Tags []string `widget:"type:multiselect;options:紧急,重要,API,UI"`
+
+// 可创建新选项
+UserTags []string `widget:"type:multiselect;options:Java,Python,Go;allow_create:true"`
+```
+
+#### color组件
+颜色选择器：
+
+```go
+// 基础颜色（6位hex）
+ThemeColor string `widget:"type:color;format:hex;show_alpha:false"`
+
+// 带透明度（8位hex）
+OverlayColor string `widget:"type:color;format:hex;show_alpha:true"`
+
+// RGBA格式
+BackgroundColor string `widget:"type:color;format:rgba;show_alpha:true"`
+```
+
+#### file_upload组件
+文件上传：
+
+```go
+// 单文件上传
+Avatar *files.Files `widget:"type:file_upload;accept:.jpg,.png,.gif;max_size:5MB"`
+
+// 多文件上传
+Documents *files.Files `widget:"type:file_upload;accept:.pdf,.doc,.docx;multiple:true"`
+```
+
+#### list组件
+列表输入，支持动态添加删除：
+
+```go
+// 简单列表
+Steps []string `widget:"type:list"`
+
+// 复杂列表
+OrderItems []OrderItem `widget:"type:list"`
+
+// OrderItem结构体
+type OrderItem struct {
+    ProductName string  `json:"product_name" runner:"name:商品名称" widget:"type:input"`
+    Quantity    int     `json:"quantity" runner:"name:数量" widget:"type:number;min:1"`
+    UnitPrice   float64 `json:"unit_price" runner:"name:单价" widget:"type:number;precision:2"`
+}
+```
+
+#### form组件
+嵌套表单：
+
+```go
+// 嵌套结构
+Address struct {
+    Province string `json:"province" runner:"name:省份" widget:"type:input"`
+    City     string `json:"city" runner:"name:城市" widget:"type:input"`
+    Detail   string `json:"detail" runner:"name:详细地址" widget:"type:input"`
+} `json:"address" runner:"name:地址" widget:"type:form"`
+```
+
+### 4.3 其他组件
+
+#### switch组件
+开关组件：
+
+```go
+IsActive bool `widget:"type:switch;true_label:启用;false_label:禁用"`
+```
+
+#### radio组件
+单选框：
+
+```go
+Gender string `widget:"type:radio;options:男,女;direction:horizontal"`
+```
+
+#### checkbox组件
+复选框：
+
+```go
+Hobbies []string `widget:"type:checkbox;options:阅读,音乐,运动,旅行"`
+```
+
+#### slider组件
+滑块：
+
+```go
+// 数值滑块
+Volume int `widget:"type:slider;min:0;max:100;unit:%"`
+
+// 评分滑块
+Rating float64 `widget:"type:slider;min:1;max:5;step:0.5;unit:分"`
+```
+
+---
+
+## 5. 回调机制
+
+### 5.1 OnInputFuzzy回调
+
+用于输入联想和实时聚合计算：
+
+#### 基础用法
+```go
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        keyword := fmt.Sprintf("%v", req.Value)
+        
+        // 查询匹配的产品
+        var products []Product
+        db := ctx.MustGetOrInitDB()
+        db.Where("name LIKE ?", "%"+keyword+"%").Find(&products)
+        
+        // 构建选项列表
+        items := make([]*usercall.InputFuzzyItem, 0)
+        for _, p := range products {
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: p.ID,
+                Label: fmt.Sprintf("%s - ¥%.2f", p.Name, p.Price),
+                DisplayInfo: map[string]interface{}{
+                    "商品名称": p.Name,
+                    "价格": p.Price,
+                    "库存": p.Stock,
+                },
+            })
+        }
+        
+        return &usercall.OnInputFuzzyResp{
+            Values: items,
+            Statistics: map[string]interface{}{
+                "搜索关键词": keyword,
+                "找到商品": len(products),
+            },
+        }, nil
+    },
+}
+```
+
+#### 聚合计算规范
+
+**🎯 核心原则**：聚合计算必须基于用户当前选择的数据，提供有实际价值的统计信息
+
+**📊 聚合计算支持规则**：
+
+| 场景 | 组件类型 | 用户操作 | 聚合计算 | 说明 |
+|---|---|---|---|---|
+| 普通单选 | `select` | 只能选一个 | [支持] text()函数 | 使用text()动态展示选中item详细信息 |
+| 普通多选 | `multiselect` | 可选择多个 | [支持] 有意义 | 多选聚合计算永远有价值 |
+| List内单选 | `list` + `select` | 可添加多行 | [支持] 有意义 | 每行选一个，但有多行数据 |
+| List内多选 | `list` + `multiselect` | 可添加多行+每行多选 | [支持] 最有意义 | 双重聚合，最强大的场景 |
+
+**🔧 支持的聚合函数**：
+- `sum(字段名)` - 求和
+- `avg(字段名)` - 平均值  
+- `min(字段名)` - 最小值
+- `max(字段名)` - 最大值
+- `count(字段名)` - 计数
+- `sum(字段名,*变量名)` - 字段值乘以变量后求和
+- `text(字段名)` - 动态展示选中item的文本信息，支持前端交互
+
+**🆕 text() 聚合函数详解**：
+
+`text()` 函数主要用于单选场景，让前端能够动态展示选中item的详细信息，实现真正的交互式数据展示。
+
+**工作原理**：
+- **触发时机**：用户选择某个item后
+- **数据来源**：基于用户当前选择的数据
+- **展示方式**：前端动态渲染，支持实时更新
+- **交互体验**：用户选择不同item，显示不同信息
+
+**使用场景**：
+- **单选字段**：医生选择、患者选择、药品选择等
+- **List内单选**：每行选择一个项目，支持聚合计算
+- **动态信息展示**：选中后立即显示详细信息，无需额外查询
+
+**注意事项**：
+- `text(字段名)` 中的字段名必须与DisplayInfo中的key完全一致
+- 前端会根据这个对应关系动态展示信息
+- 避免在DisplayInfo中放置过多数据，优先展示用户最需要的信息
+
+**[正确示例] text() 函数正确使用示例（单选场景）**：
+```go
+// 医生选择 - 单选字段，使用text()展示详细信息
+type DoctorSelectReq struct {
+    DoctorID int `json:"doctor_id" widget:"type:select"`  // 只能选择一个医生
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "doctor_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // 🆕 text() 聚合：动态展示选中医生详细信息
+                "医生姓名": "text(医生姓名)",
+                "医生职称": "text(职称)",
+                "所属科室": "text(科室)",
+                "联系电话": "text(联系电话)",
+                "专业特长": "text(备注信息)",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+**[正确示例] 多选场景**：
+```go
+// 多选字段永远支持聚合
+type OrderFormReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`  // 多选！用户可以选择多个商品
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // [支持] 多选聚合计算永远有意义
+                "选中商品数": "count(商品名称)",           // 选了几个商品
+                "选中商品总价": "sum(商品价格,*quantity)", // 总价格
+                "最低单价": "min(商品价格)",              // 选中商品中最便宜的
+                "最高单价": "max(商品价格)",              // 选中商品中最贵的
+                "平均单价": "avg(商品价格)",              // 选中商品平均价格
+                
+                // 🆕 text() 聚合：动态展示选中商品详情（多选场景）
+                "商品名称": "text(商品名称)",
+                "规格信息": "text(规格)",
+                "生产厂家": "text(生产厂家)",
+                
+                // [支持] 静态信息
+                "会员折扣": "9折优惠",
+                "批发优惠": "满10件8折",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+**[正确示例] List内单选场景**：
+```go
+// List组件内的单选字段聚合有意义
+type OrderFormReq struct {
+    OrderItems []OrderItem `json:"order_items" widget:"type:list"`  // 用户可以添加多行
+}
+
+type OrderItem struct {
+    ProductID int `json:"product_id" widget:"type:select"`  // 每行选择一个商品
+    Quantity int `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // [支持] 用户添加多行后，这些聚合计算有实际价值
+                "商品种类": "count(商品名称)",           // 选了几种不同的商品
+                "商品总数": "sum(quantity)",            // 所有商品的总数量
+                "平均单价": "avg(商品价格)",            // 选中商品的平均价格
+                "价格区间": "min(商品价格) - max(商品价格)", // 选中商品的价格范围
+                
+                // 🆕 text() 聚合：动态展示选中商品详情（List内单选场景）
+                "商品名称": "text(商品名称)",
+                "规格信息": "text(规格)",
+                "生产厂家": "text(生产厂家)",
+                
+                // [支持] 静态信息
+                "会员折扣": "9折优惠",
+                "配送说明": "满99元包邮",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+**[正确示例] List内多选场景 - 最强大**：
+```go
+// List内多选字段，双重聚合计算
+type OrderFormReq struct {
+    OrderItems []OrderItem `json:"order_items" widget:"type:list"`  // 用户可以添加多行
+}
+
+type OrderItem struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`  // 每行可以选择多个商品
+    Quantity   int   `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // [支持] List内多选聚合计算，最强大的场景
+                "选中商品数": "count(商品名称)",           // 所有行所有商品的总数
+                "批量总价": "sum(商品价格,*quantity)",    // 所有行所有商品的总价
+                "批量总重": "sum(商品重量,*quantity)",    // 所有行所有商品的总重量
+                "价格区间": "min(商品价格) - max(商品价格)", // 所有商品的价格范围
+                "商品种类": "count(商品名称)",           // 去重后的商品种类数
+                
+                // 🆕 text() 聚合：动态展示选中商品详情（List内多选场景）
+                "商品名称": "text(商品名称)",
+                "规格信息": "text(规格)",
+                "库存状态": "text(库存状态)",
+                
+                // [支持] 静态信息
+                "批发优惠": "满50件享8折",
+                "配送说明": "批量订单包邮",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+**❌ 错误示例（普通单选场景）**：
+```go
+// 普通单选字段不应该聚合
+type OrderFormReq struct {
+    CustomerID int `json:"customer_id" widget:"type:select"`  // 只能选一个客户
+    ProductID  int `json:"product_id" widget:"type:select"`   // 只能选一个商品
+    Quantity   int `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "customer_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ❌ 单选场景聚合无意义，永远显示1
+                "客户数量": "count(客户名称)",      // 错误：永远是1
+                "平均年龄": "avg(客户年龄)",       // 错误：永远是选中客户的年龄
+                "最高等级": "max(客户等级)",       // 错误：永远是选中客户的等级
+                
+                // [正确] 返回有用的静态信息
+                "结算周期": "月结30天",
+                "信用等级": "AAA级供应商",  
+                "联系方式": "400-123-4567",
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+**💡 用户体验对比**：
+
+**错误做法（单选聚合）**：
+- 用户选择"张三" → 前端显示：客户数量: 1, 平均年龄: 25, 最高等级: VIP
+- 用户困惑：系统就这一个客户吗？这些统计信息完全没有价值！
+
+**正确做法（多选聚合）**：
+- 用户选择"苹果、香蕉、橙子" → 前端显示：选中商品数: 3, 总价: ¥25.50, 平均价: ¥8.50
+- 用户满意：实时看到选择结果，帮助决策
+
+**📋 最佳实践总结**：
+
+1. **多选字段**：永远都支持聚合，无论是否在List内
+2. **单选字段**：只有在List组件内才有聚合意义
+3. **List组件**：无论单选还是多选，都支持聚合
+4. **信息数量**：聚合信息3-5条即可，避免信息过载
+5. **用户价值**：每个统计信息都要对用户有实际价值
+
+### 5.2 OnInputValidate回调
+
+用于实时字段验证：
+
+```go
+OnInputValidateMap: map[string]runner.OnInputValidate{
+    "email": func(ctx *runner.Context, req *usercall.OnInputValidateReq) (*usercall.OnInputValidateResp, error) {
+        email := fmt.Sprintf("%v", req.Value)
+        
+        // 邮箱格式验证（简单版）
+        if !strings.Contains(email, "@") {
+            return &usercall.OnInputValidateResp{
+                ErrorMsg: "邮箱格式不正确",
+            }, nil
+        }
+        
+        // 重复性检查
+        db := ctx.MustGetOrInitDB()
+        var count int64
+        err := db.Model(&User{}).Where("email = ?", email).Count(&count).Error
+        if err != nil {
+            return &usercall.OnInputValidateResp{
+                ErrorMsg: "验证失败，请重试",
+            }, nil
+        }
+        
+        if count > 0 {
+            return &usercall.OnInputValidateResp{
+                ErrorMsg: "该邮箱已被注册",
+            }, nil
+        }
+        
+        return &usercall.OnInputValidateResp{}, nil
+    },
+}
+```
+
+### 5.3 表格回调
+
+#### OnTableAddRows
+新增数据时的业务逻辑处理：
+
+```go
+OnTableAddRows: func(ctx *runner.Context, req *usercall.OnTableAddRowsReq) (*usercall.OnTableAddRowsResp, error) {
+    db := ctx.MustGetOrInitDB()
+    var rows []*Meeting
+    err := req.DecodeBy(&rows)
+    if err != nil {
+        return nil, fmt.Errorf("参数解析失败: %v", err)
+    }
+    
+    // 业务逻辑：时间冲突检测
+    for _, meeting := range rows {
+        var conflictCount int64
+        err := db.Model(&Meeting{}).
+            Where("room_id = ? AND start_time < ? AND end_time > ?", 
+                meeting.RoomID, meeting.EndTime, meeting.StartTime).
+            Count(&conflictCount).Error
+            
+        if err != nil {
+            return nil, fmt.Errorf("冲突检测失败: %v", err)
+        }
+        
+        if conflictCount > 0 {
+            return nil, fmt.Errorf("会议室在该时间段已被占用")
+        }
+    }
+    
+    // 保存数据
+    err = db.Create(&rows).Error
+    if err != nil {
+        return nil, fmt.Errorf("保存失败: %v", err)
+    }
+    
+    return &usercall.OnTableAddRowsResp{}, nil
+}
+```
+
+#### OnTableUpdateRows
+更新数据时的处理：
+
+```go
+OnTableUpdateRows: func(ctx *runner.Context, req *usercall.OnTableUpdateRowsReq) (*usercall.OnTableUpdateRowsResp, error) {
+    db := ctx.MustGetOrInitDB()
+    var meeting Meeting
+    err := req.DecodeBy(&meeting)
+    if err != nil {
+        return nil, fmt.Errorf("参数解析失败: %v", err)
+    }
+    
+    // 更新逻辑
+    err = db.Model(&Meeting{}).Where("id IN ?", req.Ids).Updates(meeting).Error
+    if err != nil {
+        return nil, fmt.Errorf("更新失败: %v", err)
+    }
+    
+    return &usercall.OnTableUpdateRowsResp{}, nil
+}
+```
+
+#### OnTableDeleteRows
+删除数据时的保护逻辑：
+
+```go
+OnTableDeleteRows: func(ctx *runner.Context, req *usercall.OnTableDeleteRowsReq) (*usercall.OnTableDeleteRowsResp, error) {
+    db := ctx.MustGetOrInitDB()
+    
+    // 业务规则：进行中的会议不能删除
+    now := time.Now().UnixMilli()
+    var processingCount int64
+    err := db.Model(&Meeting{}).
+        Where("id IN ? AND start_time <= ? AND end_time >= ?", 
+            req.Ids, now, now).
+        Count(&processingCount).Error
+            
+    if err != nil {
+        return nil, fmt.Errorf("检查失败: %v", err)
+    }
+    
+    if processingCount > 0 {
+        return nil, fmt.Errorf("存在进行中的会议，不能删除")
+    }
+    
+    // 执行删除
+    err = db.Delete(&Meeting{}, "id IN ?", req.Ids).Error
+    if err != nil {
+        return nil, fmt.Errorf("删除失败: %v", err)
+    }
+    
+    return &usercall.OnTableDeleteRowsResp{}, nil
+}
+```
+
+---
+
+## 6. 完整示例
+
+### 6.1 CRM会议室管理系统
+
+这是一个包含多个表格和复杂业务逻辑的S2级别系统：
+
+```go
+package crm
+
+import (
+    "fmt"
+    "time"
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/pkg/dto/usercall" 
+    "github.com/yunhanshu-net/function-go/runner"
+    "github.com/yunhanshu-net/pkg/query"
+    "gorm.io/gorm"
+)
+
+// 函数组配置
+var CrmMeetingRoomGroup = &runner.FunctionGroup{
+    CnName: "会议室管理",
+    EnName: "crm_meeting_room",
+}
+
+// 会议室基础信息
+type CrmMeetingRoomInfo struct {
+    ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:会议室ID" permission:"read"`
+    CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime:milli" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+    
+    Name        string `json:"name" gorm:"column:name" runner:"name:会议室名称" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+    Type        string `json:"type" gorm:"column:type" runner:"name:会议室类型" widget:"type:select;options:小型,中型,大型,会议室,培训室" data:"default_value:会议室" search:"in" validate:"required"`
+    Capacity    int    `json:"capacity" gorm:"column:capacity" runner:"name:容纳人数" widget:"type:number;min:1;max:200;unit:人" search:"gte,lte" validate:"required,min=1,max=200"`
+    Equipment   string `json:"equipment" gorm:"column:equipment" runner:"name:设备配置" widget:"type:input;mode:text_area" search:"like"`
+    Location    string `json:"location" gorm:"column:location" runner:"name:位置信息" widget:"type:input" search:"like"`
+    Status      string `json:"status" gorm:"column:status" runner:"name:状态" widget:"type:select;options:可用,维护中,停用" data:"default_value:可用" search:"in" validate:"required"`
+}
+
+func (CrmMeetingRoomInfo) TableName() string { return "crm_meeting_room_info" }
+
+// 会议室预约记录  
+type CrmMeetingRoomBooking struct {
+    ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:预约ID" permission:"read"`
+    CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime:milli" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+    
+    RoomID       int    `json:"room_id" gorm:"column:room_id" runner:"name:会议室" widget:"type:select" search:"in" validate:"required"`
+    Booker       string `json:"booker" gorm:"column:booker" runner:"name:预约人" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+    MeetingTitle string `json:"meeting_title" gorm:"column:meeting_title" runner:"name:会议主题" widget:"type:input" search:"like" validate:"required,min=2,max=200"`
+    StartTime    int64  `json:"start_time" gorm:"column:start_time" runner:"name:开始时间" widget:"type:datetime;kind:datetime" search:"gte,lte" validate:"required"`
+    EndTime      int64  `json:"end_time" gorm:"column:end_time" runner:"name:结束时间" widget:"type:datetime;kind:datetime" search:"gte,lte" validate:"required"`
+    AttendeeCount int   `json:"attendee_count" gorm:"column:attendee_count" runner:"name:参会人数" widget:"type:number;min:1;max:200;unit:人" search:"gte,lte" validate:"required,min=1,max=200"`
+    
+    // 计算字段
+    BookingStatus string `json:"booking_status" gorm:"-" runner:"name:预约状态" widget:"type:input" permission:"read"`
+    RoomName     string `json:"room_name" gorm:"-" runner:"name:会议室名称" permission:"read"`
+}
+
+func (CrmMeetingRoomBooking) TableName() string { return "crm_meeting_room_booking" }
+
+// 会议室信息管理
+type CrmMeetingRoomInfoListReq struct { query.PageInfoReq `runner:"-"` }
+
+func CrmMeetingRoomInfoList(ctx *runner.Context, req *CrmMeetingRoomInfoListReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    var rows []CrmMeetingRoomInfo
+    return resp.Table(&rows).AutoPaginated(db, &CrmMeetingRoomInfo{}, &req.PageInfoReq).Build()
+}
+
+var CrmMeetingRoomInfoListOption = &runner.TableFunctionOptions{
+	BaseConfig: runner.BaseConfig{
+		ChineseName:  "会议室基础信息管理",
+		ApiDesc:      "会议室基础信息管理，支持会议室信息的增删改查",
+		Tags:         []string{"会议室管理", "基础信息"},
+		Request:      &CrmMeetingRoomInfoListReq{},
+		Response:     query.PaginatedTable[[]CrmMeetingRoomInfo]{},
+		CreateTables: []interface{}{&CrmMeetingRoomInfo{}},
+		Group:        CrmMeetingRoomGroup,
+	},
+	AutoCrudTable: &CrmMeetingRoomInfo{},
+}
+
+// 会议室预约管理
+type CrmMeetingRoomBookingListReq struct { query.PageInfoReq `runner:"-"` }
+
+func CrmMeetingRoomBookingList(ctx *runner.Context, req *CrmMeetingRoomBookingListReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    var rows []CrmMeetingRoomBooking
+    
+    // 获取分页数据
+    td := resp.Table(&rows).AutoPaginated(db, &CrmMeetingRoomBooking{}, &req.PageInfoReq)
+    
+    // 填充计算字段
+    if len(rows) > 0 {
+        now := time.Now().UnixMilli()
+        
+        // 批量查询会议室信息
+        roomIDs := make([]int, 0, len(rows))
+        for _, row := range rows {
+            roomIDs = append(roomIDs, row.RoomID)
+        }
+        
+        var rooms []CrmMeetingRoomInfo
+        if err := db.Where("id IN ?", roomIDs).Find(&rooms).Error; err == nil {
+            roomMap := make(map[int]CrmMeetingRoomInfo)
+            for _, room := range rooms {
+                roomMap[room.ID] = room
+            }
+            
+            for i := range rows {
+                // 计算预约状态
+                if now < rows[i].StartTime {
+                    rows[i].BookingStatus = "待开始"
+                } else if now >= rows[i].StartTime && now <= rows[i].EndTime {
+                    rows[i].BookingStatus = "进行中"
+                } else {
+                    rows[i].BookingStatus = "已结束"
+                }
+                
+                // 填充会议室名称
+                if room, exists := roomMap[rows[i].RoomID]; exists {
+                    rows[i].RoomName = room.Name
+                }
+            }
+        }
+    }
+    
+    return td.Build()
+}
+
+var CrmMeetingRoomBookingListOption = &runner.TableFunctionOptions{
+	BaseConfig: runner.BaseConfig{
+		ChineseName:  "会议室预约管理",
+		ApiDesc:      "会议室预约记录管理，支持预约创建、冲突检测和状态管理",
+		Tags:         []string{"会议室管理", "预约系统"},
+		Request:      &CrmMeetingRoomBookingListReq{},
+		Response:     query.PaginatedTable[[]CrmMeetingRoomBooking]{},
+		CreateTables: []interface{}{&CrmMeetingRoomBooking{}, &CrmMeetingRoomInfo{}},
+		Group:        CrmMeetingRoomGroup,
+	},
+	AutoCrudTable: &CrmMeetingRoomBooking{},
+    
+    // 模糊搜索回调
+    OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+        "room_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+            keyword := fmt.Sprintf("%v", req.Value)
+            var rooms []CrmMeetingRoomInfo
+            
+            db := ctx.MustGetOrInitDB()
+            db.Where("name LIKE ? OR type LIKE ? OR location LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%").
+                Where("status = ?", "可用").
+                Limit(20).
+                Find(&rooms)
+                
+            items := make([]*usercall.InputFuzzyItem, 0)
+            for _, room := range rooms {
+                items = append(items, &usercall.InputFuzzyItem{
+                    Value: room.ID,
+                    Label: fmt.Sprintf("%s - %s - 容纳%d人 - %s", room.Name, room.Type, room.Capacity, room.Location),
+                    DisplayInfo: map[string]interface{}{
+                        "会议室名称": room.Name,
+                        "类型":    room.Type,
+                        "容纳人数":  room.Capacity,
+                        "位置":    room.Location,
+                        "设备配置":  room.Equipment,
+                    },
+                })
+            }
+            
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{
+                    "搜索关键词":  keyword,
+                    "可用会议室":  "仅显示状态为可用的会议室", 
+                    "找到会议室数": len(rooms),
+                },
+                Values: items,
+            }, nil
+        },
+    },
+    
+    // 新增预约时检测冲突
+    OnTableAddRows: func(ctx *runner.Context, req *usercall.OnTableAddRowsReq) (*usercall.OnTableAddRowsResp, error) {
+        db := ctx.MustGetOrInitDB()
+        var rows []*CrmMeetingRoomBooking
+        err := req.DecodeBy(&rows)
+        if err != nil {
+            return nil, fmt.Errorf("参数解析失败: %v", err)
+        }
+        
+        // 检测时间冲突
+        for _, booking := range rows {
+            var conflictCount int64
+            err := db.Model(&CrmMeetingRoomBooking{}).
+                Where("room_id = ? AND start_time < ? AND end_time > ?", 
+                    booking.RoomID, booking.EndTime, booking.StartTime).
+                Count(&conflictCount).Error
+                    
+            if err != nil {
+                return nil, fmt.Errorf("冲突检测失败: %v", err)
+            }
+            
+            if conflictCount > 0 {
+                return nil, fmt.Errorf("会议室已被占用，请选择其他时间或会议室")
+            }
+            
+            // 检查会议室是否可用
+            var room CrmMeetingRoomInfo
+            if err := db.Where("id = ?", booking.RoomID).First(&room).Error; err != nil {
+                return nil, fmt.Errorf("会议室不存在")
+            }
+            
+            if room.Status != "可用" {
+                return nil, fmt.Errorf("会议室 %s 当前状态为 %s，不可预约", room.Name, room.Status)
+            }
+            
+            // 检查人数是否超限
+            if booking.AttendeeCount > room.Capacity {
+                return nil, fmt.Errorf("参会人数 %d 超过会议室容量限制（%d人）", booking.AttendeeCount, room.Capacity)
+            }
+        }
+        
+        // 保存数据
+        err = db.Create(&rows).Error
+        if err != nil {
+            return nil, fmt.Errorf("保存预约记录失败: %v", err)
+        }
+        
+        return &usercall.OnTableAddRowsResp{}, nil
+    },
+    
+    // 删除时保护进行中的会议
+    OnTableDeleteRows: func(ctx *runner.Context, req *usercall.OnTableDeleteRowsReq) (*usercall.OnTableDeleteRowsResp, error) {
+        db := ctx.MustGetOrInitDB()
+        
+        // 检查是否有进行中的会议
+        now := time.Now().UnixMilli()
+        var processingCount int64
+        err := db.Model(&CrmMeetingRoomBooking{}).
+            Where("id IN ? AND start_time <= ? AND end_time >= ?", req.Ids, now, now).
+            Count(&processingCount).Error
+            
+        if err != nil {
+            return nil, fmt.Errorf("检查失败: %v", err)
+        }
+        
+        if processingCount > 0 {
+            return nil, fmt.Errorf("存在进行中的会议，不能删除")
+        }
+        
+        // 执行删除
+        err = db.Delete(&CrmMeetingRoomBooking{}, "id IN ?", req.Ids).Error
+        if err != nil {
+            return nil, fmt.Errorf("删除失败: %v", err)
+        }
+        
+        return &usercall.OnTableDeleteRowsResp{}, nil
+    },
+}
+
+func init() {
+    runner.Get(RouterGroup+"/crm_meeting_room_info_list", CrmMeetingRoomInfoList, CrmMeetingRoomInfoListOption)
+    runner.Get(RouterGroup+"/crm_meeting_room_booking_list", CrmMeetingRoomBookingList, CrmMeetingRoomBookingListOption)
+}
+```
+
+### 6.2 图片转换工具
+
+这是一个form类型的工具函数示例：
+
+```go
+package image
+
+import (
+    "fmt"
+    "image"
+    "image/jpeg"
+    "image/png" 
+    "os"
+    "path/filepath"
+    "strings"
+    "sync"
+    
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/runner"
+    "github.com/yunhanshu-net/pkg/typex/files"
+    "golang.org/x/image/webp"
+)
+
+// 请求结构体
+type ImageConvertReq struct {
+    // 图片上传
+    Images *files.Files `json:"images" runner:"name:图片文件" widget:"type:file_upload;accept:.png,.jpg,.jpeg,.webp;multiple:true;max_size:50MB" validate:"required"`
+    
+    // 转换设置
+    TargetFormat string `json:"target_format" runner:"name:目标格式" widget:"type:select;options:png,jpg,webp" data:"default_value:jpg" validate:"required,oneof=png jpg webp"`
+    Quality      int    `json:"quality" runner:"name:质量" widget:"type:number;min:1;max:100;unit:%" data:"default_value:85" validate:"required,min=1,max=100"`
+    
+    // 系统配置  
+    EnableConcurrency bool `json:"enable_concurrency" runner:"name:开启并发" widget:"type:switch;true_label:开启;false_label:关闭" data:"default_value:true"`
+    MaxConcurrency   int  `json:"max_concurrency" runner:"name:最大并发" widget:"type:number;min:1;max:32;unit:个" data:"default_value:4" validate:"required,min=1,max=32"`
+    MaxWidth         int  `json:"max_width" runner:"name:最大宽度" widget:"type:number;min:0;max:8192;unit:像素" data:"default_value:0"`
+    MaxHeight        int  `json:"max_height" runner:"name:最大高度" widget:"type:number;min:0;max:8192;unit:像素" data:"default_value:0"`
+    DetailedLog      bool `json:"detailed_log" runner:"name:记录详细日志" widget:"type:switch;true_label:开启;false_label:关闭" data:"default_value:false"`
+}
+
+// 响应结构体
+type ImageConvertResp struct {
+    ProcessedCount int          `json:"processed_count" runner:"name:处理成功" widget:"type:number;unit:张"`
+    FailedCount    int          `json:"failed_count" runner:"name:处理失败" widget:"type:number;unit:张"`
+    ProcessingTime string       `json:"processing_time" runner:"name:处理耗时" widget:"type:input"`
+    ConvertedFiles *files.Files `json:"converted_files" runner:"name:转换后的图片" widget:"type:file_display"`
+    ProcessLog     string       `json:"process_log" runner:"name:处理日志" widget:"type:input;mode:text_area"`
+}
+
+// 处理函数
+func ImageConvert(ctx *runner.Context, req *ImageConvertReq, resp response.Response) error {
+    if req.Images == nil {
+        return resp.Form(&ImageConvertResp{
+            ProcessLog: "错误：请上传至少一张图片",
+        }).Build()
+    }
+    
+    startTime := time.Now()
+    var processedCount, failedCount int
+    var processLog strings.Builder
+    var mu sync.Mutex
+    
+    // 创建临时目录
+    tempDir, err := os.MkdirTemp("", "image_convert_*")
+    if err != nil {
+        return resp.Form(&ImageConvertResp{
+            ProcessLog: fmt.Sprintf("创建临时目录失败: %v", err),
+        }).Build()
+    }
+    defer os.RemoveAll(tempDir)
+    
+    inputFiles := req.Images.GetFiles()
+    if len(inputFiles) == 0 {
+        return resp.Form(&ImageConvertResp{
+            ProcessLog: "错误：没有找到有效的图片文件",
+        }).Build()
+    }
+    
+    // 并发处理控制
+    maxWorkers := 1
+    if req.EnableConcurrency {
+        maxWorkers = req.MaxConcurrency
+    }
+    
+    semaphore := make(chan struct{}, maxWorkers)
+    var wg sync.WaitGroup
+    
+    if req.DetailedLog {
+        processLog.WriteString(fmt.Sprintf("开始处理 %d 张图片，并发数: %d\n", len(inputFiles), maxWorkers))
+    }
+    
+    // 处理每张图片
+    for i, inputFile := range inputFiles {
+        wg.Add(1)
+        go func(index int, file *files.File) {
+            defer wg.Done()
+            semaphore <- struct{}{}        // 获取信号量
+            defer func() { <-semaphore }() // 释放信号量
+            
+            // 处理单张图片
+            success, logMsg := convertSingleImage(file, tempDir, req, index)
+            
+            mu.Lock()
+            if success {
+                processedCount++
+            } else {
+                failedCount++
+            }
+            if req.DetailedLog {
+                processLog.WriteString(logMsg + "\n")
+            }
+            mu.Unlock()
+        }(i, inputFile)
+    }
+    
+    wg.Wait()
+    
+    // 收集输出文件
+    outputFiles, err := collectOutputFiles(tempDir)
+    if err != nil {
+        return resp.Form(&ImageConvertResp{
+            ProcessLog: fmt.Sprintf("收集输出文件失败: %v", err),
+        }).Build()
+    }
+    
+    processingTime := time.Since(startTime)
+    
+    // 构建响应
+    result := &ImageConvertResp{
+        ProcessedCount: processedCount,
+        FailedCount:    failedCount,
+        ProcessingTime: fmt.Sprintf("%.2f秒", processingTime.Seconds()),
+        ConvertedFiles: outputFiles,
+    }
+    
+    if req.DetailedLog {
+        processLog.WriteString(fmt.Sprintf("\n处理完成：成功 %d 张，失败 %d 张，耗时 %.2f 秒", 
+            processedCount, failedCount, processingTime.Seconds()))
+        result.ProcessLog = processLog.String()
+    } else {
+        result.ProcessLog = fmt.Sprintf("处理完成：成功 %d 张，失败 %d 张", processedCount, failedCount)
+    }
+    
+    return resp.Form(result).Build()
+}
+
+// 处理单张图片
+func convertSingleImage(inputFile *files.File, outputDir string, req *ImageConvertReq, index int) (bool, string) {
+    // 解码图片
+    img, format, err := image.Decode(strings.NewReader(string(inputFile.Content)))
+    if err != nil {
+        return false, fmt.Sprintf("图片 %d: 解码失败 - %v", index+1, err)
+    }
+    
+    // 尺寸调整（如果需要）
+    if req.MaxWidth > 0 || req.MaxHeight > 0 {
+        img = resizeImage(img, req.MaxWidth, req.MaxHeight)
+    }
+    
+    // 生成输出文件名
+    baseName := strings.TrimSuffix(inputFile.Filename, filepath.Ext(inputFile.Filename))
+    outputFileName := fmt.Sprintf("%s_converted.%s", baseName, req.TargetFormat)
+    outputPath := filepath.Join(outputDir, outputFileName)
+    
+    // 创建输出文件
+    outputFile, err := os.Create(outputPath)
+    if err != nil {
+        return false, fmt.Sprintf("图片 %d: 创建输出文件失败 - %v", index+1, err)
+    }
+    defer outputFile.Close()
+    
+    // 根据目标格式编码
+    switch req.TargetFormat {
+    case "jpg":
+        err = jpeg.Encode(outputFile, img, &jpeg.Options{Quality: req.Quality})
+    case "png":
+        err = png.Encode(outputFile, img)
+    case "webp":
+        // 注意：这里简化处理，实际使用需要webp编码库
+        return false, fmt.Sprintf("图片 %d: WebP格式暂未支持", index+1)
+    default:
+        return false, fmt.Sprintf("图片 %d: 不支持的格式 %s", index+1, req.TargetFormat)
+    }
+    
+    if err != nil {
+        return false, fmt.Sprintf("图片 %d: 编码失败 - %v", index+1, err)
+    }
+    
+    return true, fmt.Sprintf("图片 %d: %s -> %s (原格式: %s)", index+1, inputFile.Filename, outputFileName, format)
+}
+
+// 图片尺寸调整（简化版）
+func resizeImage(img image.Image, maxWidth, maxHeight int) image.Image {
+    // 这里应该使用图片缩放库，我们作为文档简化处理了，但是你们不允许这么干
+    return img
+}
+
+// 收集输出文件
+func collectOutputFiles(dir string) (*files.Files, error) {
+    entries, err := os.ReadDir(dir)
+    if err != nil {
+        return nil, err
+    }
+    
+    var outputFiles []*files.File
+    for _, entry := range entries {
+        if entry.IsDir() {
+            continue
+        }
+        
+        filePath := filepath.Join(dir, entry.Name())
+        content, err := os.ReadFile(filePath)
+        if err != nil {
+            continue
+        }
+        
+        outputFiles = append(outputFiles, &files.File{
+            Filename: entry.Name(),
+            Content:  content,
+            Size:     int64(len(content)),
+        })
+    }
+    
+    return &files.Files{Files: outputFiles}, nil
+}
+
+// API配置
+var ImageConvertOption = &runner.FormFunctionOptions{
+	BaseConfig: runner.BaseConfig{
+		ChineseName:  "图片格式转换",
+		ApiDesc:      "支持PNG、JPG、WebP格式互转，可批量处理，支持尺寸调整和质量控制",
+		Tags:         []string{"图片处理", "格式转换", "批量处理"},
+		Request:      &ImageConvertReq{},
+		Response:     &ImageConvertResp{},
+	},
+}
+
+func init() {
+    runner.Post(RouterGroup+"/image_convert", ImageConvert, ImageConvertOption)
+}
+```
+
+---
+
+## 7. 最佳实践
+
+### 7.1 项目组织规范
+
+#### 文件命名
+```
+单文件一系统：crm_ticket.go
+统一前缀：CrmTicket（结构体）、CrmTicketList（函数）
+表名：crm_ticket（snake_case）
+路由：RouterGroup+/crm_ticket_list
+```
+
+#### 函数组使用
+```go
+// 单功能文件 - 不需要函数组
+var CrmTicketListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        // ...
+    },
+}
+
+// 多功能文件 - 需要函数组
+var CrmMeetingRoomGroup = &runner.FunctionGroup{
+    CnName: "会议室管理",
+    EnName: "crm_meeting_room",
+}
+
+var CrmMeetingRoomInfoListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        Group: CrmMeetingRoomGroup,  // 指定函数组
+        // ...
+    },
+}
+```
+
+### 7.2 数据模型设计
+
+#### 基础字段模板
+```go
+type ModelTemplate struct {
+    // 主键
+    ID int `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:ID" permission:"read"`
+    
+    // 时间字段（系统自动）
+    CreatedAt int64 `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    UpdatedAt int64 `json:"updated_at" gorm:"autoUpdateTime:milli" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    
+    // 软删除
+    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
+    
+    // 业务字段示例
+    Name   string `json:"name" gorm:"column:name;comment:名称" runner:"name:名称" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+    Status string `json:"status" gorm:"column:status;comment:状态" runner:"name:状态" widget:"type:select;options:启用,禁用" data:"default_value:启用" search:"in" validate:"required"`
+}
+
+func (ModelTemplate) TableName() string { return "model_template" }
+```
+
+#### 时间字段规范
+```go
+// [正确] 系统时间 - 自动管理，无需format
+CreatedAt int64 `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+
+// [正确] 业务日期 - 需要format控制显示
+StartDate int64 `json:"start_date" gorm:"column:start_date" runner:"name:开始日期" widget:"type:datetime;kind:date;format:yyyy-MM-dd" validate:"required"`
+
+// [正确] 时间范围
+WorkPeriod []int64 `json:"work_period" runner:"name:工作时间段" widget:"type:datetime;kind:daterange;format:yyyy-MM-dd"`
+```
+
+#### 文件字段规范
+```go
+// [正确] 正确的文件字段定义
+Avatar *files.Files `json:"avatar" gorm:"type:json;comment:头像" runner:"name:头像" widget:"type:file_upload;accept:.jpg,.png;max_size:5MB"`
+
+// [正确] 文件展示（响应）
+Files *files.Files `json:"files" runner:"name:附件" widget:"type:file_display"`
+```
+
+### 7.3 组件选择指南
+
+#### 文本输入
+```go
+// 单行文本
+Name string `widget:"type:input"`
+
+// 多行文本  
+Description string `widget:"type:input;mode:text_area"`
+
+// 密码
+Password string `widget:"type:input;mode:password"`
+```
+
+#### 数字输入
+```go
+// 整数
+Age int `widget:"type:number;min:1;max:120;unit:岁"`
+
+// 小数
+Price float64 `widget:"type:number;min:0;precision:2;prefix:￥"`
+
+// 滑块
+Volume int `widget:"type:slider;min:0;max:100;unit:%"`
+```
+
+#### 选择输入
+```go
+// 单选下拉
+Status string `widget:"type:select;options:待处理,进行中,已完成"`
+
+// 单选按钮
+Gender string `widget:"type:radio;options:男,女;direction:horizontal"`
+
+// 多选下拉
+Tags []string `widget:"type:multiselect;options:标签1,标签2,标签3;allow_create:true"`
+
+// 复选框
+Hobbies []string `widget:"type:checkbox;options:阅读,音乐,运动"`
+
+// 开关
+IsActive bool `widget:"type:switch;true_label:启用;false_label:禁用"`
+```
+
+#### 日期时间
+```go
+// 日期选择
+StartDate int64 `widget:"type:datetime;kind:date;format:yyyy-MM-dd"`
+
+// 时间选择
+MeetingTime int64 `widget:"type:datetime;kind:time;format:HH:mm"`
+
+// 日期时间
+CreatedAt int64 `widget:"type:datetime;kind:datetime"`
+
+// 日期范围
+WorkPeriod []int64 `widget:"type:datetime;kind:daterange;format:yyyy-MM-dd"`
+```
+
+#### 复杂结构
+```go
+// 嵌套表单
+Address struct {
+    Province string `json:"province" runner:"name:省份" widget:"type:input"`
+    City     string `json:"city" runner:"name:城市" widget:"type:input"`
+} `json:"address" runner:"name:地址" widget:"type:form"`
+
+// 动态列表
+OrderItems []OrderItem `json:"order_items" runner:"name:订单项" widget:"type:list"`
+```
+
+### 7.4 回调使用指南
+
+#### OnInputFuzzy聚合规则
+```go
+// [支持] List场景 - 可以聚合
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "商品总价": "sum(价格,*quantity)",  // [支持] 可以聚合
+                "商品数量": "count(价格)",          // [支持] 可以聚合
+                "平均价格": "avg(价格)",           // [支持] 可以聚合
+            },
+            Values: items,
+        }, nil
+    },
+}
+
+// [说明] 单选场景 - 只返回静态信息
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "supplier_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ...查询逻辑
+        
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "结算周期": "月结30天",     // [说明] 静态信息
+                "信用等级": "AAA级",       // [说明] 静态信息
+                "联系方式": "400-123-4567", // [说明] 静态信息
+            },
+            Values: items,
+        }, nil
+    },
+}
+```
+
+#### 验证回调最佳实践
+```go
+OnInputValidateMap: map[string]runner.OnInputValidate{
+    "code": func(ctx *runner.Context, req *usercall.OnInputValidateReq) (*usercall.OnInputValidateResp, error) {
+        code := fmt.Sprintf("%v", req.Value)
+        
+        // 格式验证（简单检查）
+        if len(code) < 3 {
+            return &usercall.OnInputValidateResp{
+                ErrorMsg: "编码长度不能少于3位",
+            }, nil
+        }
+        
+        // 业务逻辑验证（唯一性检查）
+        db := ctx.MustGetOrInitDB()
+        var count int64
+        err := db.Model(&Product{}).Where("code = ?", code).Count(&count).Error
+        if err != nil {
+            return &usercall.OnInputValidateResp{
+                ErrorMsg: "验证失败，请重试",
+            }, nil
+        }
+        
+        if count > 0 {
+            return &usercall.OnInputValidateResp{
+                ErrorMsg: "该编码已被使用，请换一个",
+            }, nil
+        }
+        
+        return &usercall.OnInputValidateResp{}, nil
+    },
+}
+```
+
+### 7.5 错误处理规范
+
+#### Form函数错误处理
+```go
+func MyFormHandler(ctx *runner.Context, req *MyReq, resp response.Response) error {
+    // 参数验证
+    if req.Name == "" {
+        return resp.Form(&MyResp{
+            Message: "姓名不能为空",
+        }).Build()
+    }
+    
+    // 业务逻辑处理
+    db := ctx.MustGetOrInitDB()
+    result, err := processBusinessLogic(db, req)
+    if err != nil {
+        ctx.Logger.Errorf("业务处理失败: %v", err)
+        return resp.Form(&MyResp{
+            Message: fmt.Sprintf("处理失败: %v", err),
+        }).Build()
+    }
+    
+    // 成功响应
+    return resp.Form(&MyResp{
+        Message: "处理成功",
+        Data:    result,
+    }).Build()
+}
+```
+
+#### Table回调错误处理
+```go
+OnTableAddRows: func(ctx *runner.Context, req *usercall.OnTableAddRowsReq) (*usercall.OnTableAddRowsResp, error) {
+    var rows []*MyModel
+    err := req.DecodeBy(&rows)
+    if err != nil {
+        ctx.Logger.Errorf("参数解析失败: %v", err)
+        return nil, fmt.Errorf("参数格式错误，请检查输入数据")
+    }
+    
+    db := ctx.MustGetOrInitDB()
+    
+    // 业务规则验证
+    for _, row := range rows {
+        if err := validateBusinessRules(row); err != nil {
+            ctx.Logger.Errorf("业务规则验证失败: %v", err)
+            return nil, fmt.Errorf("验证失败: %v", err)
+        }
+    }
+    
+    // 数据保存
+    err = db.Create(&rows).Error
+    if err != nil {
+        ctx.Logger.Errorf("数据保存失败: %v", err)
+        return nil, fmt.Errorf("保存失败，请重试")
+    }
+    
+    return &usercall.OnTableAddRowsResp{}, nil
+}
+```
+
+---
+
+## 8. 常见问题
+
+### 8.1 开发调试
+
+#### Q: 如何查看详细的错误信息？
+A: 使用ctx.Logger记录日志：
+
+```go
+func MyHandler(ctx *runner.Context, req *MyReq, resp response.Response) error {
+    ctx.Logger.Infof("开始处理请求: %+v", req)
+    
+    db := ctx.MustGetOrInitDB()
+    if err != nil {
+        ctx.Logger.Errorf("数据库连接失败: %v", err)
+        return resp.Form(&MyResp{Message: "系统错误"}).Build()
+    }
+    
+    ctx.Logger.Infof("处理完成")
+    return resp.Form(&MyResp{Message: "成功"}).Build()
+}
+```
+
+
+
+### 8.2 性能优化
+
+#### Q: 如何优化数据库查询？
+A: 使用GORM的高级查询特性：
+
+```go
+// 预加载关联数据
+var users []User
+db.Preload("Profile").Find(&users)
+
+// 批量查询
+var products []Product
+db.Where("id IN ?", productIDs).Find(&products)
+
+// 索引优化
+type User struct {
+    Email string `gorm:"uniqueIndex"`
+    Name  string `gorm:"index"`
+}
+```
+
+#### Q: 如何处理大文件上传？
+A: 限制文件大小和类型：
+
+```go
+Files *files.Files `widget:"type:file_upload;accept:.pdf,.doc;max_size:100MB"`
+```
+
+### 8.3 部署相关
+
+#### Q: 如何配置数据库连接？
+A: 通过ctx.MustGetOrInitDB()：
+
+```go
+func MyHandler(ctx *runner.Context) error {
+    db := ctx.MustGetOrInitDB()  // 自动根据配置连接数据库
+    // 使用db进行操作
+}
+```
+
+#### Q: 如何实现多租户？
+A: 每个租户使用独立的数据库：
+
+```go
+var MyOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        CreateTables: []interface{}{&MyModel{}},  // 自动按租户建表
+    },
+}
+```
+
+### 8.4 常见错误
+
+#### Q: 标签格式错误
+```go
+// ❌ 错误：标签换行
+Name string `widget:"type:input;
+             placeholder:请输入"`
+
+// [正确] 单行标签  
+Name string `widget:"type:input;placeholder:请输入"`
+```
+
+#### Q: 时间字段处理
+```go
+// ❌ 错误：系统时间使用format
+CreatedAt int64 `widget:"type:datetime;kind:datetime;format:yyyy-MM-dd"`
+
+// [正确] 系统时间不需要format
+CreatedAt int64 `widget:"type:datetime;kind:datetime"`
+
+// [正确] 业务日期可以使用format
+StartDate int64 `widget:"type:datetime;kind:date;format:yyyy-MM-dd"`
+```
+
+#### Q: 文件字段定义
+```go
+// ❌ 错误：缺少gorm标签
+Files *files.Files `json:"files"`
+
+// [正确] 包含JSON存储标签
+Files *files.Files `json:"files" gorm:"type:json"`
+```
+
+#### Q: 聚合计算误用
+```go
+// ❌ 错误：普通单选字段使用聚合计算
+type OrderFormReq struct {
+    CustomerID int `json:"customer_id" widget:"type:select"`  // 只能选一个客户
+    ProductID  int `json:"product_id" widget:"type:select"`   // 只能选一个商品
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "customer_id": func() (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // ❌ 单选永远是1，无意义
+                "客户数量": "count(客户名称)",      // 错误：永远是1
+                "平均年龄": "avg(客户年龄)",       // 错误：永远是选中客户的年龄
+                "最高等级": "max(客户等级)",       // 错误：永远是选中客户的等级
+            },
+        }, nil
+    },
+}
+
+// [正确] 普通单选字段返回静态信息
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "customer_id": func() (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // [说明] 有用的静态信息
+                "结算周期": "月结30天",
+                "信用等级": "AAA级",
+                "联系方式": "400-123-4567",
+            },
+        }, nil
+    },
+}
+
+// [正确] List内单选字段可以聚合（因为有多行数据）
+type OrderFormReq struct {
+    OrderItems []OrderItem `json:"order_items" widget:"type:list"`
+}
+
+type OrderItem struct {
+    ProductID int `json:"product_id" widget:"type:select"`  // 每行选择一个商品
+    Quantity int `json:"quantity" widget:"type:number"`
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_id": func() (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // [支持] List内单选聚合有意义
+                "商品种类": "count(商品名称)",           // 选了几种不同的商品
+                "商品总数": "sum(quantity)",            // 所有商品的总数量
+                "平均单价": "avg(商品价格)",            // 选中商品的平均价格
+            },
+        }, nil
+    },
+}
+
+// [正确] 多选字段永远支持聚合
+type OrderFormReq struct {
+    ProductIDs []int `json:"product_ids" widget:"type:multiselect"`  // 多选！用户可以选择多个商品
+}
+
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "product_ids": func() (*usercall.OnInputFuzzyResp, error) {
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // [支持] 多选聚合计算永远有意义
+                "选中商品数": "count(商品名称)",           // 选了几个商品
+                "选中商品总价": "sum(商品价格)",          // 总价格
+                "最低单价": "min(商品价格)",              // 选中商品中最便宜的
+                "最高单价": "max(商品价格)",              // 选中商品中最贵的
+            },
+        }, nil
+    },
+}
+```
+
+**📋 聚合计算使用规则总结**：
+
+1. **普通单选字段**（`select`）：❌ 不能聚合，返回静态信息
+2. **普通多选字段**（`multiselect`）：[支持] 永远支持聚合
+3. **List内单选字段**（`list` + `select`）：[支持] 可以聚合（有多行数据）
+4. **List内多选字段**（`list` + `multiselect`）：[支持] 最有意义（双重聚合）
+
+**💡 判断标准**：看用户能否选择多个项目，能选择多个就可以聚合，只能选择一个就不能聚合（除非在List内）。
+
+---
+
+## 总结
+
+function-go是一个强大的AI原生全栈开发框架，通过结构体标签自动生成Web界面，支持完整的CRUD操作、智能回调机制和自动建表功能。
+
+### 核心优势
+
+1. **开发效率高**：一个文件即一个应用，快速原型开发
+2. **学习成本低**：标准Go语法，无需学习额外DSL
+3. **功能完整**：涵盖表单、表格、文件、回调等全部功能
+4. **可扩展性强**：支持复杂业务逻辑和自定义回调
+5. **部署简单**：单文件部署，支持多租户隔离
+
+### 适用场景
+
+- 企业管理系统（CRM、ERP、OA）
+- 数据处理工具
+- 快速原型开发
+- API服务构建
+- 表单和工作流系统
+
+通过本指南，开发者可以快速掌握function-go框架的使用方法，高效构建各类Web应用。

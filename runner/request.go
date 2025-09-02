@@ -18,7 +18,7 @@ func (r *Runner) runFunction(ctx context.Context, req *request.RunFunctionReq) (
 	router, exist := r.getRouter(req.Router, req.Method)
 	if !exist {
 		routersJSON, _ := json.Marshal(r.routerMap)
-		logger.ErrorContextf(ctx, "可用路由: %s", string(routersJSON))
+		logger.Errorf(ctx, "可用路由: %s", string(routersJSON))
 		return nil, fmt.Errorf("路由未找到: [%s] %s", req.Method, req.Router)
 	}
 
@@ -31,7 +31,7 @@ func (r *Runner) runFunction(ctx context.Context, req *request.RunFunctionReq) (
 			if r := recover(); r != nil {
 				stack := debug.Stack()
 				errMsg := fmt.Sprintf("请求处理panic: %v", r)
-				logger.ErrorContextf(ctx, "%s\n调用栈: %s", errMsg, stack)
+				logger.Errorf(ctx, "%s\n调用栈: %s", errMsg, stack)
 				err = fmt.Errorf(errMsg)
 				// 这里打印是方便我出现错误时候可以直接在控制台看到日志
 				fmt.Printf("err: %s\n调用栈: %s\n", errMsg, stack)
@@ -50,7 +50,7 @@ func (r *Runner) runFunction(ctx context.Context, req *request.RunFunctionReq) (
 		_, rsp, callErr := router.call(newContext, req.Body)
 		runtime.ReadMemStats(&mEnd)
 		if callErr != nil {
-			err = fmt.Errorf("路由调用失败: %w", callErr)
+			err = fmt.Errorf("%w", callErr)
 			return
 		}
 

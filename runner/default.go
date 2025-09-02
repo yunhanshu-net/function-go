@@ -11,7 +11,6 @@ import (
 
 	constants "github.com/yunhanshu-net/pkg/constants/usercall"
 	"github.com/yunhanshu-net/pkg/logger"
-	"github.com/yunhanshu-net/pkg/x/jsonx"
 	"gorm.io/gorm/schema"
 	"strings"
 )
@@ -96,15 +95,16 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 
 	if config.Response != nil {
 		// 获取响应参数信息
-		responseParams, err := api.NewResponseParams(config.Response, opt.GetRenderType())
+		//responseParams, err := api.NewResponseParams(config.Response, opt.GetRenderType())
+		responseParams, err := api.NewResponseParams(config.Response, opt.GetRenderType(), infoInterface)
 		if err != nil {
 			return nil, err
 		}
 		apiInfo.ParamsOut = responseParams
 	}
 
-	logger.Infof(context.Background(), "worker %s AutoUpdateConfig ==nil:%v config: %v el:%+v ",
-		worker.Router, config.AutoUpdateConfig == nil, jsonx.String(config), config)
+	//logger.Infof(context.Background(), "worker %s AutoUpdateConfig ==nil:%v config: %v el:%+v ",
+	//	worker.Router, config.AutoUpdateConfig == nil, jsonx.String(config), config)
 
 	if opt.GetAutoCrudTable() != nil {
 		apiInfo.Callbacks = append(apiInfo.Callbacks, constants.CallbackTypeOnTableAddRows)
@@ -144,12 +144,7 @@ func (r *Runner) buildApiInfo(worker *routerInfo) (*api.Info, error) {
 	for _, table := range config.CreateTables {
 		if tb, ok := table.(schema.Tabler); ok {
 			apiInfo.UseTables = append(apiInfo.UseTables, tb.TableName())
-		}
-	}
-	// 获取数据表信息
-	for _, table := range config.CreateTables { //记录函数创建的表
-		if tb, ok := table.(schema.Tabler); ok {
-			apiInfo.CreateTables = append(apiInfo.UseTables, tb.TableName())
+			apiInfo.CreateTables = append(apiInfo.CreateTables, tb.TableName())
 		}
 	}
 	for table, crud := range config.OperateTables { //记录函数对表的crud操作

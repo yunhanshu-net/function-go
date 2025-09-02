@@ -1,0 +1,334 @@
+# SFT数据构造规范
+
+## 🎯 核心理念
+
+SFT数据质量决定代码生成质量。本规范确保生成的训练数据具有：
+- **结构化标准**：统一的格式和模式
+- **信息完整**：大模型生成代码所需的全部信息
+- **表达精准**：避免歧义和冗余
+- **工程化质量**：生产级代码标准，而非演示代码
+- **极简原则**：rag-api标签直接精准，不搞包级概览，避免信息重复
+- **命名规范**：文件名作为命名前缀，确保命名不重复、易维护
+- **代码顺序**：概念递进、依赖有序，优化大模型学习效果
+
+## 📋 三层注释结构
+
+### 1. 头部元数据（SFT_METADATA）
+**用途**：供开发人员打标使用，训练时自动剔除，只保留需求信息和文件名称
+
+```go
+/*
+<SFT_METADATA>
+需求: [用户的原始自然语言需求描述]
+文件: [filename].go
+难度: [初级/中级/高级]
+依赖: [独立/依赖说明]
+训练点: [核心训练要点，如：标准字段设计、OnInputFuzzy聚合、复杂业务逻辑等]
+</SFT_METADATA>
+*/
+```
+
+### 2. 代码中的训练强化注释
+**用途**：框架注释 + 逻辑注释双重覆盖，精准而全面
+
+#### 2.1 框架模式注释
+```go
+// 【框架规范】文件名school_student.go → 统一前缀SchoolStudent，避免命名冲突
+var SchoolStudentGroup = &runner.FunctionGroup{
+    CnName: "学生管理", 
+    EnName: "school_student", // 【框架要求】EnName必须等于文件名
+}
+
+// 【框架规范】数据模型映射：结构体SchoolStudent → 表名school_student（自动转蛇形）
+type SchoolStudent struct {
+    // 【框架标准】主键字段模式
+    ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:学生ID" permission:"read"`
+    CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+    
+    // 【标签规范】gorm存储 + runner展示 + widget UI + search查询 + validate验证
+    Name      string `json:"name" gorm:"comment:姓名" runner:"name:姓名" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+    Grade     string `json:"grade" gorm:"comment:年级" runner:"name:年级" widget:"type:select;options:一年级,二年级,三年级" search:"in" validate:"required"`
+    Status    string `json:"status" gorm:"comment:状态" runner:"name:学籍状态" widget:"type:select;options:在校生,已毕业" data:"default_value:在校生" search:"in" validate:"required"`
+}
+
+// 【框架要求】TableName方法，返回蛇形表名
+func (SchoolStudent) TableName() string {
+    return "school_student"
+}
+```
+
+#### 2.2 业务逻辑注释
+```go
+// 【业务功能】学生列表查询，支持按姓名、年级、状态筛选
+func SchoolStudentList(ctx *runner.Context, req *SchoolStudentListReq, resp response.Response) error {
+    // 【框架模式】Table函数标准实现：获取DB → 定义结果集 → AutoPaginated处理
+    db := ctx.MustGetOrInitDB()
+    var rows []SchoolStudent
+    
+    // 【框架核心】AutoPaginated自动处理分页、搜索、排序，基于模型的search标签
+    return resp.Table(&rows).AutoPaginated(db, &SchoolStudent{}, &req.PageInfoReq).Build()
+}
+
+// 【业务功能】创建学生档案，验证数据后插入数据库
+func SchoolStudentCreate(ctx *runner.Context, req *SchoolStudentCreateReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    
+    // 【业务逻辑】构建学生对象，设置默认状态为在校生
+    student := &SchoolStudent{
+        Name:   req.Name,
+        Grade:  req.Grade,
+        Status: "在校生", // 新建学生默认在校状态
+    }
+    
+    // 【业务处理】保存到数据库，处理可能的错误
+    if err := db.Create(student).Error; err != nil {
+        // 【用户体验】返回友好错误提示，不暴露技术细节
+        return resp.Form(&SchoolStudentCreateResp{
+            Message: "创建学生失败，请检查信息是否正确",
+        }).Build()
+    }
+    
+    // 【业务反馈】成功创建后返回结果和新生成的ID
+    return resp.Form(&SchoolStudentCreateResp{
+        Message:   "学生档案创建成功！",
+        StudentID: student.ID,
+        Name:      student.Name,
+    }).Build()
+}
+```
+
+#### 2.3 回调逻辑注释
+```go
+// 【框架功能】OnInputFuzzy实现动态搜索和聚合统计
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "student_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // 【业务逻辑】根据用户输入的关键词搜索学生
+        keyword := fmt.Sprintf("%v", req.Value)
+        var students []SchoolStudent
+        
+        db := ctx.MustGetOrInitDB()
+        // 【查询逻辑】按姓名和班级模糊搜索，只查询在校生，限制结果数量
+        db.Where("name LIKE ? OR class_name LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
+            Where("status = ?", "在校生").
+            Limit(20).
+            Find(&students)
+        
+        // 【数据转换】构建前端显示的选项列表
+        items := make([]*usercall.InputFuzzyItem, 0)
+        for _, s := range students {
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: s.ID,
+                Label: fmt.Sprintf("%s (%s)", s.Name, s.Grade), // 显示：姓名(年级)
+                DisplayInfo: map[string]interface{}{
+                    "姓名": s.Name,
+                    "年级": s.Grade,
+                    "班级": s.ClassName,
+                },
+            })
+        }
+        
+        // 【框架规范】List场景可以使用聚合统计，单选场景只返回Values
+        return &usercall.OnInputFuzzyResp{
+            Values: items,
+            // 【业务价值】在选课等场景中，可以显示统计信息帮助用户决策
+            Statistics: map[string]interface{}{
+                "在校生总数": "count(ID)",      // 当前搜索结果的学生数量
+                "年级分布":   "年级统计信息",     // 可以显示年级分布
+                "提示":     "仅显示在校学生",    // 业务规则提示
+            },
+        }, nil
+    },
+}
+```
+
+#### 2.4 配置和注册注释
+```go
+// 【框架配置】Table函数选项配置，定义API基本信息和自动CRUD
+var SchoolStudentListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "school_student_list",        // 【重要】必须与路由路径一致
+        ChineseName:  "学生管理-列表",
+        ApiDesc:      "学生信息列表展示，支持搜索和分页",
+        Tags:         []string{"学生管理", "教务系统"},
+        Request:      &SchoolStudentListReq{},      // 【框架要求】请求结构体
+        Response:     query.PaginatedTable[[]SchoolStudent]{}, // 【框架要求】分页响应格式
+        CreateTables: []interface{}{&SchoolStudent{}}, // 【框架功能】自动建表
+        
+        Group:        SchoolStudentGroup,
+    },
+    AutoCrudTable: &SchoolStudent{}, // 【框架功能】自动提供增删改功能
+}
+
+// 【框架规范】API路由注册：Table用GET，Form用POST
+func init() {
+    // 【路由规则】路径格式 = RouterGroup + "/" + EnglishName
+    runner.Get(RouterGroup+"/school_student_list", SchoolStudentList, SchoolStudentListOption)
+    runner.Post(RouterGroup+"/school_student_create", SchoolStudentCreate, SchoolStudentCreateOption)
+}
+```
+
+### 3. 能力暴露（CAPABILITY_EXPORT）
+**用途**：在定义上方暴露完整能力，便于同步维护
+
+#### 注释受众分类
+```go
+// 【SFT训练】- 给大模型学习的框架和业务模式
+// 【开发说明】- 给项目内部开发者看的实现细节  
+// 【API文档】- 给外部调用者看的接口说明
+// 【复用指南】- 给其他模块引用时的使用指导
+```
+
+#### 数据模型暴露（基于用户实践，推荐）
+
+**方案1：rag-api标签（简洁业务导向）**
+```go
+// <rag-api>
+// 学生表：支持姓名搜索、年级筛选，表名school_student
+type SchoolStudent struct {
+    ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:学生ID" permission:"read"`
+    Name      string         `json:"name" gorm:"column:name;comment:姓名" runner:"name:姓名" widget:"type:input" search:"like" validate:"required,min=2,max=50"`
+    Grade     string         `json:"grade" gorm:"column:grade;comment:年级" runner:"name:年级" widget:"type:select;options:一年级,二年级,三年级" search:"in" validate:"required"`
+    Status    string         `json:"status" gorm:"column:status;comment:学籍状态" runner:"name:学籍状态" widget:"type:select;options:在校生,已毕业" data:"default_value:在校生" search:"in" validate:"required"`
+    // ... 其他字段
+}
+// </rag-api>
+
+// 【SFT训练】数据模型映射：结构体SchoolStudent → 表名school_student  
+func (SchoolStudent) TableName() string {
+    return "school_student"
+}
+```
+
+**方案2：结构化capability标签（功能更丰富）**
+```go
+/*<capability>
+{
+  "type": "model",
+  "export": "SchoolStudent",
+  "table": "school_student", 
+  "desc": "学生信息管理模型，支持姓名搜索、年级筛选",
+  "usage": "db.Where(\"name LIKE ?\", \"%张三%\").Find(&students)",
+  "struct": "[自动提取]"
+}
+</capability>*/
+
+// 【SFT训练】数据模型映射：结构体SchoolStudent → 表名school_student
+type SchoolStudent struct {
+    // 完整结构体定义...
+}
+```
+
+#### 工具函数暴露（基于用户实践，推荐）
+
+**方案1：rag-api标签（包含函数签名，简洁业务导向）**
+```go
+// <rag-api>
+// FFmpeg路径解析器：按优先级获取可用路径（DB→本地→PATH）
+func videoFfmpegResolveFFmpeg(ctx *runner.Context) (installPath string, err error) {
+// </rag-api>
+	videoFfmpegEnsureInstalled(ctx)
+	// 实际实现：优先DB已安装→本地→PATH...
+}
+```
+
+**方案2：结构化JSON标签（复杂场景）**
+```go
+/*<rag-api>
+{
+  "type": "function",
+  "name": "videoFfmpegResolveFFmpeg", 
+  "signature": "func(ctx *runner.Context) (installPath string, err error)",
+  "purpose": "FFmpeg路径解析器，支持多种安装方式的自动检测",
+  "usage": "ffmpegPath, err := videoFfmpegResolveFFmpeg(ctx)",
+  "priority": "DB已安装版本 > 本地.ffmpeg/bin > 系统PATH"
+}
+</rag-api>*/
+
+// 【SFT训练】工具函数：FFmpeg路径解析，智能检测多种安装方式
+func videoFfmpegResolveFFmpeg(ctx *runner.Context) (installPath string, err error) {
+    // 实际实现...
+}
+```
+
+## 🏆 rag-api标签的技术价值
+
+### **核心优势**
+- ✅ **语义精准**：RAG(检索增强生成)直接体现AI时代的文档用途
+- ✅ **技术导向**：明确标识这是为大模型检索准备的结构化信息  
+- ✅ **生态友好**：便于构建RAG知识库、向量化、搜索索引等工具链
+- ✅ **未来导向**：体现AI驱动开发的核心理念
+
+### **工具生态设计**
+```go
+// RAG知识库构建
+type RAGKnowledgeBase struct {
+    APIs        []*RAGAPIInfo     // 所有rag-api信息
+    Embeddings  []float64         // 向量化表示
+    SearchIndex *SearchIndex      // 搜索索引
+}
+
+// AI代码生成时的工作流
+func GenerateCodeWithRAG(prompt string) string {
+    // 1. 检索相关的rag-api信息
+    relevantAPIs := ragKB.Query(prompt)
+    
+    // 2. 构建增强prompt
+    enhancedPrompt := BuildPromptWithRAGAPIs(prompt, relevantAPIs)
+    
+    // 3. 调用大模型生成高质量代码
+    return LLMGenerate(enhancedPrompt)
+}
+```
+
+## 🔧 质量标准
+
+### 核心要求
+- ✅ **生产级代码**：能直接运行，不允许演示代码
+- ✅ **逻辑自洽**：业务功能完整闭环
+- ✅ **框架规范**：严格遵循function-go规范，不自造API
+- ✅ **大道至简**：注释精准强化核心，避免啰嗦
+
+### 检查清单
+- [ ] 元数据标记完整
+- [ ] 核心注释到位（命名规范、标准模式、关键概念）
+- [ ] 完整结构体暴露
+- [ ] 代码可编译运行
+- [ ] 业务逻辑合理
+
+## 🎯 核心原则
+
+1. **元数据用于标记**：训练时自动剔除，只保留需求和文件名
+2. **注释大道至简**：精准强化框架核心概念，避免冗余说明  
+3. **完整结构体暴露**：提供完整类型信息，避免大模型猜测
+4. **生产级质量**：每个样本都是可直接使用的高质量代码
+
+## ⚠️ 关键规范强调
+
+### 命名规范（严格执行）
+**核心原则**：文件名作为命名前缀，确保命名不重复
+
+| 文件名 | 结构体 | 函数 | 表名 |
+|---|---|---|---|
+| `school_student.go` | `SchoolStudent` | `SchoolStudentList` | `school_student` |
+| `school_course_select.go` | `SchoolCourseSelect` | `SchoolCourseSelectBusiness` | `school_course_select` |
+
+### 代码顺序（大模型学习优化）
+```
+1. 数据模型（基础概念层）      ← 建立基础概念
+2. 接口类型（契约定义层）      ← 定义输入输出  
+3. 工具函数（支撑功能层）      ← 提供工具支撑
+4. 核心业务逻辑（业务功能层）  ← 实现业务逻辑
+5. 框架适配层（技术实现层）    ← 技术适配
+6. 配置和注册（基础设施层）    ← 基础设施
+```
+
+### 文件拆分原则（依赖分离）
+- 📁 基础无依赖模块优先（如：**学生管理** - 提供学生数据基础）
+- 📁 有依赖的业务模块独立（如：**学生选课系统** - 学生数据从学生管理模块获取）
+- ✅ metadata中明确声明依赖关系和数据来源
+
+---
+
+**核心理念**：高质量SFT数据 = 高质量代码生成。精准训练，避免信息过载。
+
+**完整示例请参考**：[SFT数据构造规范-最佳实践.mdc](./SFT数据构造规范-最佳实践.mdc)

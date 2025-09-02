@@ -1,0 +1,119 @@
+# package 与文件组织规范（一文件一系统）
+
+本规范沉淀平台核心共识：一个 Go 文件 = 一个完整前后端系统（模型 + 处理函数 + 配置 + 路由 + 自动 UI + 自动建表）。
+
+## 一、推荐的目录/包（package）划分
+
+- 业务域优先（便于复用）：如 `crm`、`hr`、`finance`、`ops`、`sales`
+- 租户/组织（便于隔离）：如 `org_finance`、`company_abc`
+
+选型建议：平台模板/对外发版 → 业务域划分；企业多团队落地 → 组织划分。
+
+## 二、单文件 = 单系统
+
+- 文件名 = 系统英文名（蛇形）：`intel_ticket.go`、`hr_interview.go`
+- 结构体用单数：`IntelTicket`
+- 表名蛇形并显式：`func (IntelTicket) TableName() string { return "intel_ticket" }`
+- EnglishName、API 路径与文件名前缀一致：
+  - EnglishName：`intel_ticket_list`
+  - 路由：`/{package}/intel_ticket_list`
+  - 文件：`intel_ticket.go`
+
+## 三、文件内的功能组织（函数组）
+
+- 同文件定义函数组并贯穿使用：
+  ```go
+  var IntelTicketGroup = &runner.FunctionGroup{CnName: "工单系统", EnName: "intel_ticket"}
+  ```
+- 一个文件内可包含多个功能：
+  - table：`IntelTicketList` + `TableFunctionOptions{ AutoCrudTable: &IntelTicket{} }`
+  - form：`IntelTicketCreate`
+  - 可选：统计、导入导出等
+- 命名统一前缀：`IntelTicketList`、`IntelTicketCreate`、`IntelTicketAddService`、`calcIntelTicketPriority`
+
+## 四、命名与路由对齐（强约束）
+
+- 结构体：单数驼峰（`IntelTicket`）
+- 表名：蛇形（`intel_ticket`）
+- EnglishName：蛇形（`intel_ticket_list` / `intel_ticket_create`）
+- 路由：`/{package}/{english_name}`（如 `/form_table_example/intel_ticket_list`）
+- 文件名：`intel_ticket.go`
+
+配套规范：详见《命名表名-极简.mdc》。
+
+## 五、何时跨文件（仍在同 package）
+
+- 当单文件过大（> 8 功能、> 1000 行）或存在明确子域边界时：
+  - 拆分为多个“系统文件”，如 `crm_lead.go`、`crm_customer.go`、`crm_activity.go`
+  - 共享的通用类型/常量集中于极小基座文件（仅类型，不含业务），如 `crm_types.go`
+
+## 六、内部私有函数与并发/事务
+
+- 私有函数前缀化：`textAnalyzerCountWords`、`urlShortenerGenerateShortAlias`
+- Service 前缀化：`IntelTicketAddService`/`Update`/`Delete`
+- 事务规范：数据库写入必须事务封装；并发唯一约束（如单号）需重试/去重策略
+- 浮点/金额：统一保留精度处理（如 `math.Round(x*100)/100`）
+
+## 七、OnInputFuzzy 与前端聚合
+
+- 仅 list/multiselect 场景做聚合（`sum/avg/min/max/count`，乘法变量取同级字段）
+- 单选/表单内 select 仅返回静态/动态说明，不做聚合
+- 精简 3-5 条对用户有价值的信息
+
+配套规范：详见《OnInputFuzzy聚合计算的常见用法和规范.mdc》。
+
+## 八、SFT 生成模板（落地约定）
+
+- 每个生成目标产出单个 `.go` 文件，包含：
+  - 函数组、模型（含 TableName）、请求/响应、处理函数、Options、init 路由
+  - table 必带 `AutoCrudTable` 与收敛的 `search` 标签
+  - form 仅做核心业务，错误直接 `return err`
+  - 文件/EnglishName/路径/表名四者对齐
+
+## 九、示例（最小化片段）
+
+```go
+// 文件：intel_ticket.go（package: form_table_example）
+var IntelTicketGroup = &runner.FunctionGroup{CnName: "工单系统", EnName: "intel_ticket"}
+
+type IntelTicket struct { /* ... */ }
+func (IntelTicket) TableName() string { return "intel_ticket" }
+
+type IntelTicketListReq struct { query.PageInfoReq `runner:"-"` }
+func IntelTicketList(ctx *runner.Context, req *IntelTicketListReq, resp response.Response) error {
+  db := ctx.MustGetOrInitDB(); var rows []IntelTicket
+  return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.PageInfoReq).Build()
+}
+
+var IntelTicketListOption = &runner.TableFunctionOptions{ /* EnglishName: "intel_ticket_list", AutoCrudTable: &IntelTicket{} */ }
+
+func init() {
+  runner.Get("/form_table_example/intel_ticket_list", IntelTicketList, IntelTicketListOption)
+}
+```
+
+以上约定保证：
+- 单文件可独立生成与运行
+- 跨文件零冲突（标识符/表名/路由）
+- 平台可批量 SFT 生成、可自动测试与部署
+
+
+## 附：Fork 友好/零依赖规范补充（pdftools 系列）
+
+- 强前缀文件名，避免跨项目冲突：
+  - `pdftools_merge.go`、`pdftools_split.go`、`pdftools_optimize.go`、`pdftools_rotate.go`、`pdftools_encrypt.go`、`pdftools_decrypt.go`
+  - `pdftools_watermark_text.go`（含字体库强依赖同体）、`pdftools_watermark_image.go`
+  - 其他：`pdftools_zip.go`、`pdftools_zip_index.go`、`pdftools_validate.go`、`pdftools_crop.go`
+- 符号前缀与文件名一致，防冲突：
+  - `pdftools_merge.go` → `PdftoolsMergeReq/Resp/Handle/Option`
+  - `pdftools_rotate.go` → `PdftoolsRotateReq/Resp/Handle/Option`
+  - `pdftools_watermark_text.go` → `PdftoolsWatermarkText*`；字体库模型与工具：`PdftoolsWatermarkTextFont`、`pdftoolsWatermarkTextResolveFontInfo`、`pdftoolsWatermarkTextIncreaseFontUsage`
+- 函数组：仅当同一文件包含多个功能时才建立；组名=文件名驼峰，`EnName`=文件名蛇形；实现“连体打包”
+- EnglishName/路由：蛇形、与文件名一致，例如：
+  - `EnglishName: pdftools_merge`，路由 `/pdftools/merge`
+  - `EnglishName: pdftools_watermark_text`，路由 `/pdftools/watermark_text`
+- 模型单数、表名蛇形且与前缀一致：如 `PdftoolsWatermarkTextFont` ↔ `pdftools_watermark_text_font`
+- 强依赖同文件合并，禁止 common：
+  - 文本水印强依赖字体库，统一放在 `pdftools_watermark_text.go`；不要跨包/跨文件调用
+  - 小工具函数（如 `sanitizeFileName`、`normalizePageSelection`）在各文件内前缀化复制，避免共享依赖
+- OnInputFuzzy/Statistics：遵循“有数组才聚合”，信息精简 3–5 条，业务价值优先

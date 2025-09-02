@@ -1,0 +1,279 @@
+# Function Groups 函数组使用指南
+
+## 概述
+
+Function Groups（函数组）是 function-go 框架中用于组织和分类相关函数的重要机制。通过函数组，可以将多个相关的函数归类到同一个组下，便于前端展示和用户理解。
+
+## 核心概念
+
+### 1. 函数组定义
+```go
+// 定义函数组
+var MyFunctionGroup = &runner.FunctionGroup{
+    CnName: "我的函数组",  // 中文名称
+    EnName: "my_function_group",  // 英文名称
+}
+```
+
+### 2. 函数组使用
+```go
+// 在函数配置中使用函数组
+var MyFunctionOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "my_function",
+        ChineseName:  "我的函数",
+        ApiDesc:      "函数描述",
+        Tags:         []string{"标签1", "标签2"},
+        Request:      &MyFunctionReq{},
+        Response:     &MyFunctionResp{},
+        Group:        MyFunctionGroup,  // 指定函数组
+    },
+}
+```
+
+## 实际应用示例
+
+### 智能工单系统函数组
+
+```go
+// 1. 定义函数组（与文件同前缀，避免跨文件冲突）
+var IntelTicketsGroup = &runner.FunctionGroup{
+    CnName: "智能工单系统", 
+    EnName: "intel_tickets",
+}
+
+// 2. 工单列表查询函数（Table函数）
+var IntelTicketsListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "intel_tickets_list",
+        ChineseName:  "我的工单列表",
+        ApiDesc:      "查询当前用户的工单列表，支持分页和搜索。",
+        Tags:         []string{"工单管理", "列表查询", "用户工单"},
+        Request:      &IntelTicketsListReq{},
+        Response:     query.PaginatedTable[[]IntelTickets]{},
+        CreateTables: []interface{}{&IntelTickets{}},
+        Group:        IntelTicketsGroup,  // 指定函数组
+    },
+    AutoCrudTable: &IntelTickets{},
+    // ... 其他配置
+}
+
+// 3. 工单提交函数（Form函数）
+var IntelTicketsCreateOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "intel_tickets_create",
+        ChineseName:  "工单提交",
+        ApiDesc:      "用户提交工单，系统自动计算预计处理时间。",
+        Tags:         []string{"工单管理", "用户提交"},
+        Request:      &IntelTicketsCreateReq{},
+        Response:     &IntelTicketsCreateResp{},
+        Group:        IntelTicketsGroup,  // 指定函数组
+    },
+}
+```
+
+## 函数组设计原则
+
+### 1. 业务相关性
+```go
+// ✅ 正确：相关业务函数归为一组
+var CustomerManagementGroup = &runner.FunctionGroup{
+    CnName: "客户管理系统",
+    EnName: "customer_management"
+}
+
+// 客户信息管理
+// 客户联系记录
+// 客户分类管理
+// 客户投诉处理
+```
+
+### 2. 功能完整性
+```go
+// ✅ 正确：一个完整的业务流程
+var OrderManagementGroup = &runner.FunctionGroup{
+    CnName: "订单管理系统", 
+    EnName: "order_management"
+}
+
+// 订单创建（Form）
+// 订单列表（Table）
+// 订单详情（Form）
+// 订单统计（Form）
+```
+
+### 3. 用户角色区分
+```go
+// ✅ 正确：按用户角色分组
+var AdminToolsGroup = &runner.FunctionGroup{
+    CnName: "管理员工具",
+    EnName: "admin_tools"
+}
+
+var UserToolsGroup = &runner.FunctionGroup{
+    CnName: "用户工具", 
+    EnName: "user_tools"
+}
+```
+
+## 常见函数组分类
+
+### 1. 业务管理系统
+```go
+// 客户管理
+var CustomerGroup = &runner.FunctionGroup{CnName: "客户管理", EnName: "customer"}
+
+// 订单管理  
+var OrderGroup = &runner.FunctionGroup{CnName: "订单管理", EnName: "order"}
+
+// 库存管理
+var InventoryGroup = &runner.FunctionGroup{CnName: "库存管理", EnName: "inventory"}
+
+// 财务管理
+var FinanceGroup = &runner.FunctionGroup{CnName: "财务管理", EnName: "finance"}
+```
+
+### 2. 工具函数组
+```go
+// 文本处理工具
+var TextToolsGroup = &runner.FunctionGroup{CnName: "文本处理", EnName: "text_tools"}
+
+// 数学计算工具
+var MathToolsGroup = &runner.FunctionGroup{CnName: "数学计算", EnName: "math_tools"}
+
+// 格式转换工具
+var FormatToolsGroup = &runner.FunctionGroup{CnName: "格式转换", EnName: "format_tools"}
+
+// 文件处理工具
+var FileToolsGroup = &runner.FunctionGroup{CnName: "文件处理", EnName: "file_tools"}
+```
+
+### 3. 系统管理组
+```go
+// 用户管理
+var UserManagementGroup = &runner.FunctionGroup{CnName: "用户管理", EnName: "user_management"}
+
+// 权限管理
+var PermissionGroup = &runner.FunctionGroup{CnName: "权限管理", EnName: "permission"}
+
+// 系统配置
+var SystemConfigGroup = &runner.FunctionGroup{CnName: "系统配置", EnName: "system_config"}
+```
+
+## 最佳实践
+
+### 1. 命名规范
+```go
+// ✅ 正确：使用有意义的名称
+var CustomerManagementGroup = &runner.FunctionGroup{
+    CnName: "客户管理系统",  // 中文名称清晰
+    EnName: "customer_management",  // 英文名称规范
+}
+
+// ❌ 错误：命名不清晰
+var Group1 = &runner.FunctionGroup{
+    CnName: "组1",
+    EnName: "group1",
+}
+```
+
+### 2. 分组逻辑
+```go
+// ✅ 正确：按业务逻辑分组
+// 客户管理相关函数
+func CustomerList() { /* ... */ }      // Group: CustomerGroup
+func CustomerCreate() { /* ... */ }    // Group: CustomerGroup  
+func CustomerUpdate() { /* ... */ }    // Group: CustomerGroup
+
+// ❌ 错误：不相关的函数放在一组
+func CustomerList() { /* ... */ }      // Group: CustomerGroup
+func OrderCreate() { /* ... */ }       // Group: CustomerGroup  // 不应该在这里
+```
+
+### 3. 函数数量控制
+```go
+// ✅ 正确：合理的函数数量
+var TextToolsGroup = &runner.FunctionGroup{CnName: "文本处理", EnName: "text_tools"}
+// 字符串转换
+// 文本统计
+// 格式验证
+// 编码转换
+// 总共4-6个函数，便于管理
+
+// ❌ 错误：函数过多或过少
+// 过多：一个组包含20+个函数，难以管理
+// 过少：一个组只有1个函数，失去分组意义
+```
+
+## 前端展示效果
+
+### 1. 分组展示
+```
+📁 客户管理系统
+├── 📋 客户列表
+├── ➕ 新增客户  
+├── ✏️ 编辑客户
+└── 📊 客户统计
+
+📁 订单管理系统
+├── 📋 订单列表
+├── ➕ 创建订单
+├── 📝 订单详情
+└── 📈 订单分析
+
+📁 文本处理工具
+├── 🔤 大小写转换
+├── 🔄 字符串反转
+├── 📊 文本统计
+└── 🔍 格式验证
+```
+
+### 2. 用户体验
+- **清晰的分类**：用户可以快速找到需要的功能
+- **逻辑分组**：相关功能聚集在一起，降低学习成本
+- **导航便利**：通过分组快速定位到目标功能
+
+## 命名约定补充（CnName/EnName）
+- CnName（中文名）：用于中文介绍/中文名称，要求可读、能表达功能用途
+- EnName（英文标识）：等于文件名（蛇形），用于唯一标识与路由对齐
+
+示例：
+```go
+// 文件：pdftools_watermark_text.go
+var PdftoolsWatermarkTextGroup = &runner.FunctionGroup{
+    CnName: "PDF文本水印（含字体库）",
+    EnName: "pdftools_watermark_text", // 等于文件名
+}
+```
+
+## 注意事项
+
+### 1. 函数组命名
+- 中文名称要简洁明了，便于用户理解
+- 英文名称要符合命名规范，避免特殊字符
+- 名称要体现组内函数的共同特征
+
+### 2. 函数归属
+- 一个函数只能属于一个函数组
+- 相关函数应该放在同一个组内
+- 避免将不相关的函数强行分组
+
+### 3. 组内函数数量
+- 建议每个组包含3-8个函数
+- 太少失去分组意义，太多难以管理
+- 根据业务复杂度适当调整
+
+## 总结
+
+函数组是 function-go 框架中重要的组织机制，通过合理的分组可以：
+
+1. **提升用户体验**：清晰的分类和导航
+2. **便于维护管理**：相关功能集中管理
+3. **提高开发效率**：快速定位和复用功能
+4. **支持业务扩展**：新功能可以轻松归类
+
+合理使用函数组，可以让整个系统更加有序和易用。
+description:
+globs:
+alwaysApply: false
+---

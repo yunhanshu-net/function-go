@@ -30,9 +30,17 @@ type ApiInfoRequest struct {
 type OnPageLoadReq struct {
 }
 
+type OnPageLoadMessage struct {
+	Type    string `json:"type"`    //warn/error
+	Title   string `json:"title"`   //标题
+	Content string `json:"content"` //内容
+}
 type OnPageLoadResp struct {
-	Request interface{} `json:"request"`  //会初始化前端的表单参数
-	AutoRun bool        `json:"auto_run"` //是否自动运行
+	Request interface{} `json:"request"` //会初始化前端的表单参数
+
+	Message    *OnPageLoadMessage `json:"message"`
+	DisableRun bool               `json:"disable_run"` //禁止此次运行
+	AutoRun    bool               `json:"auto_run"`    //是否自动运行
 }
 
 type OnApiCreatedReq struct {
@@ -76,30 +84,35 @@ type OnVersionChangeReq struct {
 }
 
 type OnInputFuzzyReq struct {
-	Code  string `json:"code"`
-	Value string `json:"value"`
+	Code    string      `json:"code"`  //回调的这个字段的key
+	Value   interface{} `json:"value"` //用户输入的值
+	Request interface{} `json:"request"`
 }
 
-type OnInputValidateReq struct {
-	Code  string      `json:"code"`
-	Value interface{} `json:"value"`
-}
-
-type OnTableDeleteRowsReq struct {
-	Ids []int `json:"ids"`
-}
-
-type OnTableUpdateRowsReq struct {
-	Ids    []int                  `json:"ids"`
-	Fields map[string]interface{} `json:"fields"` // 要更新的字段和值的映射
-}
-
-func (r *OnTableUpdateRowsReq) DecodeBy(el interface{}) error {
-	err := jsonx.Convert(r.Fields, el)
+func (c *OnInputFuzzyReq) DecodeBy(el interface{}) error {
+	err := jsonx.Convert(c.Request, el)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+type OnInputValidateReq struct {
+	Code    string      `json:"code"`
+	Value   interface{} `json:"value"`
+	Request interface{} `json:"request"`
+}
+
+func (c *OnInputValidateReq) DecodeBy(el interface{}) error {
+	err := jsonx.Convert(c.Request, el)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OnTableDeleteRowsReq struct {
+	Ids []int `json:"ids"`
 }
 
 type OnTableAddRowsReq struct {
@@ -150,8 +163,13 @@ type InputFuzzyItem struct {
 	Icon        string                 `json:"icon"`
 	DisplayInfo map[string]interface{} `json:"display_info"`
 }
+
 type OnInputFuzzyResp struct {
-	Values []*InputFuzzyItem `json:"values"`
+	//只有在结构体数组或者切片下的select和multiselect组件才会有聚合计算的功能，场景例如收银，我一个[]Orders
+	//下面有ProductId，然后每个产品虽然选择产品id，但是DisplayInfo里返回了价格，这时候我想价格求和来计算，statistics"价格":"sum"即可
+
+	Statistics map[string]interface{} `json:"statistics"`
+	Values     []*InputFuzzyItem      `json:"values"`
 }
 
 type OnInputValidateResp struct {

@@ -3,6 +3,7 @@ package runner
 import (
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
+	"strings"
 )
 
 func Get[ReqPtr any](router string, handler func(ctx *Context, req ReqPtr, resp response.Response) error, options ...Option) {
@@ -31,6 +32,7 @@ func Patch[ReqPtr any](router string, handler func(ctx *Context, req ReqPtr, res
 }
 
 func (r *Runner) initOptions(method string, router string, handel interface{}, options ...Option) *routerInfo {
+
 	key := fmtKey(router, method)
 	worker := &routerInfo{
 		key:    key,
@@ -39,14 +41,23 @@ func (r *Runner) initOptions(method string, router string, handel interface{}, o
 		Router: router,
 	}
 	if len(options) > 0 && options[0] != nil {
+		setEnName(router, options[0])
 		worker.Option = options[0]
-
 		// 处理 AutoUpdateConfig
 		if options[0].GetBaseConfig().AutoUpdateConfig != nil {
 			r.registerAutoUpdateConfig(router, method, options[0].GetBaseConfig().AutoUpdateConfig)
 		}
 	}
 	return worker
+}
+
+func setEnName(router string, option Option) {
+	split := strings.Split(router, "/")
+	enname := split[len(split)-1]
+	config := option.GetBaseConfig()
+	if config != nil {
+		config.EnglishName = enname
+	}
 }
 
 func (r *Runner) get(router string, handel interface{}, options ...Option) {

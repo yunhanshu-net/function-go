@@ -2,10 +2,11 @@ package logger
 
 import (
 	"fmt"
-	"github.com/yunhanshu-net/pkg/x/jsonx"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/yunhanshu-net/pkg/x/jsonx"
 )
 
 type Logger struct {
@@ -13,7 +14,37 @@ type Logger struct {
 	DataMap map[string]interface{} `json:"data_map"`
 }
 
+// ensureInitialized 确保Logger已初始化，如果没有则自动初始化
+func (l *Logger) ensureInitialized() {
+	if l.DataMap == nil {
+		l.DataMap = make(map[string]interface{})
+	}
+}
+
+// 全局logger实例
+var defaultLogger *Logger
+
+// 初始化默认logger
+func init() {
+	defaultLogger = &Logger{
+		Level:   "INFO",
+		DataMap: make(map[string]interface{}),
+	}
+}
+
+// 获取默认logger实例
+func GetDefaultLogger() *Logger {
+	if defaultLogger == nil {
+		defaultLogger = &Logger{
+			Level:   "INFO",
+			DataMap: make(map[string]interface{}),
+		}
+	}
+	return defaultLogger
+}
+
 func (l *Logger) logPrint(level string, msg string) {
+	l.ensureInitialized()
 	_, file, line, _ := runtime.Caller(2)
 	l.DataMap["a_ts"] = time.Now().Unix()
 	l.DataMap["a_msg"] = msg

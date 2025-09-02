@@ -1,0 +1,182 @@
+## 大模型生成规范（一文件一系统）
+
+目标：让任意大模型按本规范，直接生成可编译、可运行、可复用的 Go 单文件系统（function-go 框架）。
+
+### 一、核心理念
+- 一文件=一个完整系统：模型/API/路由/UI/回调/建表封装在同一 `.go` 文件中；同文件内用 `runner.FunctionGroup` 组织功能。
+- 规范优先于技巧：命名/表名/路由/时间/文件/回调有统一口径，保证“稳态输出”。
+- 可复用可分发：单文件可以被 Fork 到任意项目，CreateTables 首次访问自动建表，天然支持多租户物理隔离。
+
+### 二、命名与路由（强约束）
+- 文件名、EnglishName、API 路径、表名一律 snake_case，对应 Go 标识用统一前缀的驼峰单数，例如：
+  - 文件：`intel_ticket.go`
+  - 函数组：`IntelTicketGroup`
+  - 模型：`IntelTicket`
+  - 表名：`intel_ticket`
+  - 列表函数：`IntelTicketList` / EnglishName: `intel_ticket_list` / 路由：`/form_table_example/intel_ticket_list`
+  - 表单函数：`IntelTicketCreate` / EnglishName: `intel_ticket_create` / 路由：`/form_table_example/intel_ticket_create`
+- 统一前缀：文件内所有导出符号（结构体/函数/变量/Service/Helper）均以相同前缀开头，避免包内冲突。
+
+### 三、HTTP 方法与参数绑定
+- Form 类型统一使用 POST。
+- Table 类型统一使用 GET。
+- 如必须 GET 承载表单参数，字段必须补 `form:"..."` 标签以绑定查询参数；时间统一毫秒时间戳（ms）。
+
+### 四、模型与表（GORM）
+- 系统时间字段：`CreatedAt/UpdatedAt` 使用毫秒时间戳（autoCreateTime:milli/autoUpdateTime:milli）。业务日期字段可加 `format:yyyy-MM-dd` 用于显示；系统时间无需 `format`。
+- 表名实现 `TableName()` 返回 snake_case 单数。
+- `permission` 仅在 Table 函数中使用：`read/create/update/create,update` 控制页面显示；Form 函数无需该标签。
+- 文件字段一律使用 `*files.Files`，且 `gorm:"type:json"` 持久化元数据。
+
+### 五、标签规范（精简高频）
+- runner：`code`（字段编码）与 `name`（字段显示名）必填。
+- widget：指定组件，如 `input/number/select/multiselect/datetime/list/form/file_upload/file_display/switch/slider/color`；`format` 仅在确需时使用。
+- data：示例/默认值，变量默认值需使用 `$` 前缀，例如：`data:"default_value:$now"`（当前时间毫秒）。常量使用例如 `1` `审核中` 这种 。
+- 目前支持的变量
+- $now 获取当前时间日期，前端根据format自动格式化
+- validate：`required/min/max/oneof/...`。
+- search（仅 Table）：文本（like）、区间（gte,lte）、枚举（in）。
+
+### 六、回调规范
+- OnInputFuzzy（输入联想/聚合）：
+  - 仅在 List/Multiselect 多选场景做聚合（sum/avg/min/max/count）；单选返回静态信息，不做聚合。
+  - 乘法聚合变量来自同级请求结构体字段，不来自 DisplayInfo。
+  - 信息精简：3–5 条。
+- OnInputValidate（输入校验）：如时间冲突校验等，返回错误消息字符串。
+
+### 七、配置管理（AutoUpdateConfig）
+- 配置以“表单化”的方式在 Options 中声明默认值，运行时 `ctx.GetConfig()` 实时生效。
+- 仅时间场景统一使用毫秒时间戳；前端可提交固定日期时间戳，后端解析 HH:mm 与当天日期组合计算。
+
+### 八、常见坑（必看）
+- Form 用 POST；若 GET，必须 `form:"..."` 绑定。
+- 所有时间统一毫秒时间戳；仅业务日期用 `format`。
+- `*files.Files` + `gorm:"type:json"`；不要用 `files.File`。
+- permission 仅 Table 使用；Form 不需要。
+- 统一前缀与单数模型，避免包内冲突。
+
+---
+
+## 完整可运行示例（最小但规范）
+
+```go
+// 文件：intel_ticket.go
+package form_table_example
+
+import (
+    "github.com/yunhanshu-net/function-go/pkg/dto/response"
+    "github.com/yunhanshu-net/function-go/runner"
+    "github.com/yunhanshu-net/pkg/query"
+)
+
+// 说明：单文件=系统；统一前缀 IntelTicket；Form 用 POST，Table 用 GET
+var IntelTicketGroup = &runner.FunctionGroup{CnName: "工单", EnName: "intel_ticket"}
+
+// 模型：单数；系统时间毫秒；TableName 为 snake_case 单数
+type IntelTicket struct {
+    ID        int   `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:ID" permission:"read"`
+    CreatedAt int64 `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间"`
+    Title     string `json:"title" runner:"name:标题" widget:"type:input" validate:"required,min=2,max=50"`
+}
+
+func (IntelTicket) TableName() string { return "intel_ticket" }
+
+// Table：分页列表（AutoCrud）
+type IntelTicketListReq struct { query.PageInfoReq `runner:"-"` }
+
+func IntelTicketList(ctx *runner.Context, req *IntelTicketListReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    var rows []IntelTicket
+    return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.PageInfoReq).Build()
+}
+
+var IntelTicketListOption = &runner.TableFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "intel_ticket_list",
+        ChineseName:  "工单-列表",
+        ApiDesc:      "最小示例-列表",
+        Tags:         []string{"示例", "规范"},
+        Request:      &IntelTicketListReq{},
+        Response:     query.PaginatedTable[[]IntelTicket]{},
+        CreateTables: []interface{}{&IntelTicket{}},
+        Group:        IntelTicketGroup,
+    },
+    AutoCrudTable: &IntelTicket{},
+}
+
+// Form：创建
+type IntelTicketCreateReq struct {
+    Title string `json:"title" runner:"name:标题" widget:"type:input" validate:"required"`
+}
+
+type IntelTicketCreateResp struct {
+    Message string `json:"message" runner:"name:结果"`
+    ID      int    `json:"id" runner:"name:ID"`
+}
+
+func IntelTicketCreate(ctx *runner.Context, req *IntelTicketCreateReq, resp response.Response) error {
+    db := ctx.MustGetOrInitDB()
+    row := &IntelTicket{Title: req.Title}
+    if err := db.Create(row).Error; err != nil { return err }
+    return resp.Form(&IntelTicketCreateResp{Message: "创建成功", ID: row.ID}).Build()
+}
+
+var IntelTicketCreateOption = &runner.FormFunctionOptions{
+    BaseConfig: runner.BaseConfig{
+        EnglishName:  "intel_ticket_create",
+        ChineseName:  "工单-新建",
+        ApiDesc:      "最小示例-创建",
+        Tags:         []string{"示例", "规范"},
+        Request:      &IntelTicketCreateReq{},
+        Response:     &IntelTicketCreateResp{},
+        Group:        IntelTicketGroup,
+    },
+}
+
+func init() {
+    runner.Get("/form_table_example/intel_ticket_list", IntelTicketList, IntelTicketListOption)
+    runner.Post("/form_table_example/intel_ticket_create", IntelTicketCreate, IntelTicketCreateOption)
+}
+```
+
+### OnInputFuzzy 聚合示例（片段）
+多选/列表场景（list/multiselect）聚合统计，单选仅返回静态信息。
+
+```go
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    // 多选：可做聚合
+    "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ... 查询 items
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "总价": "sum(价格,*quantity)",
+                "种类": "count(价格)",
+                "最低价": "min(价格)",
+            },
+            Values: items,
+        }, nil
+    },
+    // 单选：仅静态信息
+    "supplier_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // ... 查询 items
+        return &usercall.OnInputFuzzyResp{Values: items, Statistics: map[string]interface{}{
+            "结算周期": "月结/周结",
+        }}, nil
+    },
+}
+```
+
+---
+
+## 生成清单（Checklist）
+- [ ] 文件名/EnglishName/路由/表名全蛇形，结构体单数且统一前缀
+- [ ] Form 用 POST；Table 用 GET；GET 绑定需 `form:"..."`
+- [ ] 系统时间毫秒；仅业务日期用 `format`
+- [ ] files：`*files.Files` + `gorm:"type:json"`
+- [ ] CreateTables 统一建表；Table 配 `AutoCrudTable`
+- [ ] OnInputFuzzy：多选才聚合，单选静态信息；3–5 条
+- [ ] OnInputValidate：边界/冲突校验
+- [ ] 默认值变量 `$` 前缀（如 `$now/$1`）
+
+只要遵守以上规则，大模型即可稳定产出可运行、可复用、可分发的单文件系统。
+

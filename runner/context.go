@@ -3,6 +3,8 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/yunhanshu-net/function-go/env"
@@ -165,7 +167,8 @@ type UserInfo struct {
 func (c *Context) GetUserInfo() UserInfo {
 
 	return UserInfo{
-		Username: c.user,
+		IsLoggedIn: true,
+		Username:   c.user,
 	}
 }
 
@@ -249,6 +252,72 @@ func (c *Context) CreateFilesFromPath(localPath string) (*files.Files, error) {
 		return nil, err
 	}
 	return files, nil
+}
+
+// ===== Temp 目录工具（统一输出到 ./temp/<traceID>/...） =====
+
+// TempBaseDir 返回当前请求的基础临时目录路径：./temp/<traceID>
+// 并确保目录已创建。
+func (c *Context) TempBaseDir() (string, error) {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("获取工作目录失败: %w", err)
+	}
+	base := filepath.Join(workDir, "temp", c.getTraceId())
+	if err := os.MkdirAll(base, 0755); err != nil {
+		return "", fmt.Errorf("创建临时目录失败: %w", err)
+	}
+	return base, nil
+}
+
+// TempDir 在基础临时目录下拼接子路径并确保创建。
+func (c *Context) TempDir(parts ...string) (string, error) {
+	base, err := c.TempBaseDir()
+	if err != nil {
+		return "", err
+	}
+	full := filepath.Join(append([]string{base}, parts...)...)
+	if err := os.MkdirAll(full, 0755); err != nil {
+		return "", fmt.Errorf("创建临时子目录失败: %w", err)
+	}
+	return full, nil
+}
+
+// TempUniqueDir 在基础临时目录下创建带时间戳的唯一子目录：./temp/<traceID>/<prefix>/<ns>
+func (c *Context) TempUniqueDir(prefix string, parts ...string) (string, error) {
+	baseParts := []string{prefix, fmt.Sprintf("%d", time.Now().UnixNano())}
+	baseParts = append(baseParts, parts...)
+	return c.TempDir(baseParts...)
+}
+
+// ===== FS 聚合句柄 =====
+
+// ContextFS 聚合：文件与临时目录相关方法
+type ContextFS struct{ ctx *Context }
+
+// FS 返回文件系统聚合句柄
+func (c *Context) FS() *ContextFS { return &ContextFS{ctx: c} }
+
+// Time 返回时间处理聚合句柄
+func (c *Context) TimeUtils() *ContextTime { return &ContextTime{ctx: c} }
+
+// 目录相关（委托 Context 内部实现）
+func (fs *ContextFS) TempBaseDir() (string, error)            { return fs.ctx.TempBaseDir() }
+func (fs *ContextFS) TempDir(parts ...string) (string, error) { return fs.ctx.TempDir(parts...) }
+func (fs *ContextFS) TempUniqueDir(prefix string, parts ...string) (string, error) {
+	return fs.ctx.TempUniqueDir(prefix, parts...)
+}
+
+// Files 构建与上传（委托 Context 内部实现）
+func (fs *ContextFS) NewFiles(input interface{}) *files.Files { return fs.ctx.NewFiles(input) }
+func (fs *ContextFS) NewTemporaryFiles() *files.Files         { return fs.ctx.NewTemporaryFiles() }
+func (fs *ContextFS) NewExpiringFiles() *files.Files          { return fs.ctx.NewExpiringFiles() }
+func (fs *ContextFS) NewPermanentFiles() *files.Files         { return fs.ctx.NewPermanentFiles() }
+func (fs *ContextFS) CreateFilesFromData(filename string, data []byte) (*files.Files, error) {
+	return fs.ctx.CreateFilesFromData(filename, data)
+}
+func (fs *ContextFS) CreateFilesFromPath(localPath string) (*files.Files, error) {
+	return fs.ctx.CreateFilesFromPath(localPath)
 }
 
 // ===== Config 相关方法 =====

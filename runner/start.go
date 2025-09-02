@@ -89,7 +89,7 @@ func Run() error {
 // Shutdown 统一的资源关闭入口，处理所有资源的释放
 func Shutdown() {
 	shutdownOnce.Do(func() {
-		logger.Info(context.Background(), "开始执行系统关闭...")
+		//logger.Info(context.Background(), "开始执行系统关闭...")
 
 		// 1. 先关闭Runner连接，包括NATS连接等
 		if err := r.close(context.Background()); err != nil {
@@ -102,7 +102,6 @@ func Shutdown() {
 		// 3. 这里添加其他需要关闭的资源
 		// ...
 
-		logger.Info(context.Background(), "系统关闭完成")
 	})
 }
 
