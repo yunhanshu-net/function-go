@@ -192,7 +192,7 @@ func (r *Runner) writeInitialConfig(worker *routerInfo, configStruct interface{}
 	configManager := GetConfigManager()
 
 	// 创建正确初始化的上下文
-	ctx := NewContext(context.Background(), worker.Method, worker.Router)
+	ctx := NewContext(context.Background(), worker.Method, worker.Router, r)
 
 	// 检查配置是否已存在
 	existingConfig := configManager.GetByKey(ctx, configKey)

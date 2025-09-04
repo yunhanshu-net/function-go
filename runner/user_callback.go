@@ -536,10 +536,9 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 			return fmt.Errorf("OnDryRunReq decode failed: %w", err)
 		}
 
-		// 记录请求详情
-		reqDataJSON, _ := json.Marshal(reqData)
-		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %s", req.Type, reqDataJSON)
-
+		logger.Infof(ctx, "回调处理中 [类型:%s] 请求详情: %+v", req.Type, req)
+		ctx.refRouter = req.Router
+		ctx.refMethod = req.Method
 		respData, err := onDryRun(ctx, &reqData)
 		if err != nil {
 			logger.Errorf(ctx, "回调处理失败 [类型:%s]: %v", req.Type, err)

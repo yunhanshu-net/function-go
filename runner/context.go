@@ -79,6 +79,8 @@ func (l *ContextLogger) Fatalf(format string, args ...interface{}) {
 }
 
 type Context struct {
+	refRouter string
+	refMethod string
 	context.Context
 	user    string
 	name    string
@@ -90,9 +92,11 @@ type Context struct {
 	Locker *Lock
 	// Logger 绑定的日志记录器
 	Logger *ContextLogger
+
+	runner *Runner
 }
 
-func NewContext(ctx context.Context, method string, router string) *Context {
+func NewContext(ctx context.Context, method string, router string, runner *Runner) *Context {
 	// 获取trace_id
 	traceID := ""
 	if value := ctx.Value(constants.TraceID); value != nil {
@@ -125,6 +129,7 @@ func NewContext(ctx context.Context, method string, router string) *Context {
 	// 创建Context实例
 	contextInstance := &Context{
 		Context: c,
+		runner:  runner,
 		user:    env.User,
 		name:    env.Name,
 		version: env.Version,
@@ -332,6 +337,7 @@ func (c *Context) GetConfig() interface{} {
 	configKey := c.generateConfigKey()
 	c.Logger.Infof("GetConfig - 配置键: %s", configKey)
 
+	//todo 这里如果是在回调方法里的话会导致，路由取回调路径无法获取到配置，所以我们应该获取注册的真实路径
 	configData := c.ConfigManager().GetByKey(c, configKey)
 	if configData == nil {
 		c.Logger.Warnf("GetConfig - 配置数据为空")
@@ -348,6 +354,9 @@ func (c *Context) GetConfig() interface{} {
 
 // generateConfigKey 生成配置键
 func (c *Context) generateConfigKey() string {
+	if c.refMethod != "" && c.refRouter != "" {
+		return usercall.GenerateConfigKey(c.refRouter, c.refMethod)
+	}
 	return usercall.GenerateConfigKey(c.router, c.method)
 }
 

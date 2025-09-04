@@ -60,7 +60,7 @@ func (r *Runner) userCallCmd(cmd *cobra.Command, args []string) {
 	//}
 	c := context.WithValue(context.Background(), constants.TraceID, traceId)
 	//c = context.WithValue(c, trace.FunctionMsgKey, createFunctionMsg(traceId))
-	ctx := NewContext(c, method, router)
+	ctx := NewContext(c, method, router, r)
 
 	err = r._callback(ctx, req, resp)
 	if err != nil {

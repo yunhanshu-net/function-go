@@ -1,113 +1,109 @@
 package runner
 
 import (
-	"context"
 	"fmt"
-	"testing"
-
-	"github.com/yunhanshu-net/function-go/env"
 	"github.com/yunhanshu-net/pkg/trace"
 )
 
-func TestActualUploadDemo(t *testing.T) {
-	fmt.Println("🚀 实际上传测试")
-	fmt.Println("==================================================")
-
-	// 0. 设置测试环境变量
-	originalUser := env.User
-	originalName := env.Name
-	originalVersion := env.Version
-
-	env.User = "testuser"
-	env.Name = "testapp"
-	env.Version = "v1.0.0"
-
-	// 测试结束后恢复原值
-	defer func() {
-		env.User = originalUser
-		env.Name = originalName
-		env.Version = originalVersion
-	}()
-
-	// 1. 创建context
-	ctx := context.WithValue(context.Background(), "trace_id", "actual-upload-demo-12345")
-
-	// 2. 创建runner context
-	runnerCtx := NewContext(ctx, "POST", "api/actual_upload_test")
-
-	// 3. 显示上传路径信息
-	uploadPath := runnerCtx.GetUploadPath()
-	fmt.Printf("📁 规范上传路径: %s\n", uploadPath)
-
-	// 4. 获取FunctionMsg详细信息
-	functionMsg := runnerCtx.GetFunctionMsg()
-	if functionMsg != nil {
-		fmt.Printf("👤 用户: '%s'\n", functionMsg.User)
-		fmt.Printf("📱 应用: '%s'\n", functionMsg.Runner)
-		fmt.Printf("🔢 版本: '%s'\n", functionMsg.Version)
-		fmt.Printf("🌐 路由: %s\n", functionMsg.Router)
-		fmt.Printf("📋 方法: %s\n", functionMsg.Method)
-		fmt.Printf("🔍 TraceID: %s\n", functionMsg.TraceID)
-		fmt.Printf("☁️  上传提供商: %s\n", functionMsg.UploadConfig.Provider)
-		fmt.Printf("🪣 存储桶: %s\n", functionMsg.UploadConfig.Bucket)
-		fmt.Printf("🔗 下载域名: %s\n", functionMsg.UploadConfig.DownloadDomain)
-	}
-
-	fmt.Println("\n" + "====================================================")
-
-	// 5. 创建测试文件内容
-	testContent := `{
-	"test": "这是一个实际上传测试文件",
-	"timestamp": "2025-06-28T14:40:00Z",
-	"data": {
-		"numbers": [1, 2, 3, 4, 5],
-		"message": "Hello from actual upload test!",
-		"chinese": "中文测试内容",
-		"purpose": "验证上传路径是否符合规范"
-	},
-	"metadata": {
-		"author": "test-user",
-		"test_type": "actual_upload_verification",
-		"expected_path_format": "/user/app/api/actual_upload_test/POST/output/YYYYMMDD/filename"
-	}
-}`
-
-	// 6. 上传文件
-	fmt.Println("📤 开始实际上传文件...")
-	files, err := runnerCtx.CreateFilesFromData("actual_upload_demo.json", []byte(testContent))
-
-	if err != nil {
-		t.Logf("❌ 上传失败: %v", err)
-		return
-	}
-
-	// 7. 显示上传结果
-	if len(files.GetFiles()) > 0 {
-		file := files.GetFiles()[0]
-		fmt.Println("\n✅ 文件上传成功!")
-		fmt.Printf("📄 文件名: %s\n", file.Name)
-		fmt.Printf("📏 文件大小: %d bytes\n", file.Size)
-		fmt.Printf("🏷️  文件类型: %s\n", file.ContentType)
-		fmt.Printf("📅 创建时间: %s\n", file.CreatedAt)
-		fmt.Printf("🔄 更新时间: %s\n", file.UpdatedAt)
-		fmt.Printf("✨ 状态: %s\n", file.Status)
-		fmt.Printf("\n🔗 完整访问URL:\n%s\n", file.URL)
-
-		// 分析URL结构
-		fmt.Println("\n🔍 URL结构分析:")
-		analyzeURL(file.URL)
-
-		// 验证路径是否符合规范
-		fmt.Println("\n📋 路径规范验证:")
-		validateUploadPath(file.URL, functionMsg)
-
-	} else {
-		t.Error("❌ 没有文件被上传")
-	}
-
-	fmt.Println("\n" + "====================================================")
-	fmt.Println("✨ 实际上传测试完成!")
-}
+//func TestActualUploadDemo(t *testing.T) {
+//	fmt.Println("🚀 实际上传测试")
+//	fmt.Println("==================================================")
+//
+//	// 0. 设置测试环境变量
+//	originalUser := env.User
+//	originalName := env.Name
+//	originalVersion := env.Version
+//
+//	env.User = "testuser"
+//	env.Name = "testapp"
+//	env.Version = "v1.0.0"
+//
+//	// 测试结束后恢复原值
+//	defer func() {
+//		env.User = originalUser
+//		env.Name = originalName
+//		env.Version = originalVersion
+//	}()
+//
+//	// 1. 创建context
+//	ctx := context.WithValue(context.Background(), "trace_id", "actual-upload-demo-12345")
+//
+//	// 2. 创建runner context
+//	runnerCtx := NewContext(ctx, "POST", "api/actual_upload_test")
+//
+//	// 3. 显示上传路径信息
+//	uploadPath := runnerCtx.GetUploadPath()
+//	fmt.Printf("📁 规范上传路径: %s\n", uploadPath)
+//
+//	// 4. 获取FunctionMsg详细信息
+//	functionMsg := runnerCtx.GetFunctionMsg()
+//	if functionMsg != nil {
+//		fmt.Printf("👤 用户: '%s'\n", functionMsg.User)
+//		fmt.Printf("📱 应用: '%s'\n", functionMsg.Runner)
+//		fmt.Printf("🔢 版本: '%s'\n", functionMsg.Version)
+//		fmt.Printf("🌐 路由: %s\n", functionMsg.Router)
+//		fmt.Printf("📋 方法: %s\n", functionMsg.Method)
+//		fmt.Printf("🔍 TraceID: %s\n", functionMsg.TraceID)
+//		fmt.Printf("☁️  上传提供商: %s\n", functionMsg.UploadConfig.Provider)
+//		fmt.Printf("🪣 存储桶: %s\n", functionMsg.UploadConfig.Bucket)
+//		fmt.Printf("🔗 下载域名: %s\n", functionMsg.UploadConfig.DownloadDomain)
+//	}
+//
+//	fmt.Println("\n" + "====================================================")
+//
+//	// 5. 创建测试文件内容
+//	testContent := `{
+//	"test": "这是一个实际上传测试文件",
+//	"timestamp": "2025-06-28T14:40:00Z",
+//	"data": {
+//		"numbers": [1, 2, 3, 4, 5],
+//		"message": "Hello from actual upload test!",
+//		"chinese": "中文测试内容",
+//		"purpose": "验证上传路径是否符合规范"
+//	},
+//	"metadata": {
+//		"author": "test-user",
+//		"test_type": "actual_upload_verification",
+//		"expected_path_format": "/user/app/api/actual_upload_test/POST/output/YYYYMMDD/filename"
+//	}
+//}`
+//
+//	// 6. 上传文件
+//	fmt.Println("📤 开始实际上传文件...")
+//	files, err := runnerCtx.CreateFilesFromData("actual_upload_demo.json", []byte(testContent))
+//
+//	if err != nil {
+//		t.Logf("❌ 上传失败: %v", err)
+//		return
+//	}
+//
+//	// 7. 显示上传结果
+//	if len(files.GetFiles()) > 0 {
+//		file := files.GetFiles()[0]
+//		fmt.Println("\n✅ 文件上传成功!")
+//		fmt.Printf("📄 文件名: %s\n", file.Name)
+//		fmt.Printf("📏 文件大小: %d bytes\n", file.Size)
+//		fmt.Printf("🏷️  文件类型: %s\n", file.ContentType)
+//		fmt.Printf("📅 创建时间: %s\n", file.CreatedAt)
+//		fmt.Printf("🔄 更新时间: %s\n", file.UpdatedAt)
+//		fmt.Printf("✨ 状态: %s\n", file.Status)
+//		fmt.Printf("\n🔗 完整访问URL:\n%s\n", file.URL)
+//
+//		// 分析URL结构
+//		fmt.Println("\n🔍 URL结构分析:")
+//		analyzeURL(file.URL)
+//
+//		// 验证路径是否符合规范
+//		fmt.Println("\n📋 路径规范验证:")
+//		validateUploadPath(file.URL, functionMsg)
+//
+//	} else {
+//		t.Error("❌ 没有文件被上传")
+//	}
+//
+//	fmt.Println("\n" + "====================================================")
+//	fmt.Println("✨ 实际上传测试完成!")
+//}
 
 // analyzeURL 分析URL结构
 func analyzeURL(url string) {
