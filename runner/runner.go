@@ -67,6 +67,30 @@ type Runner struct {
 	natsSubscribe *nats.Subscription
 	routerMap     map[string]*routerInfo
 	down          chan struct{}
+	runningCount  *uint
+}
+
+func (r *Runner) GetRunningCount() uint {
+	if r.runningCount == nil {
+		r.runningCount = new(uint)
+		return *r.runningCount
+	}
+	return *r.runningCount
+}
+func (r *Runner) AddRunningCount(count uint) {
+	if r.runningCount == nil {
+		var a uint = 1
+		r.runningCount = &a
+		return
+	}
+	*r.runningCount += count
+}
+func (r *Runner) SubRunningCount(count uint) {
+	if r.runningCount == nil {
+		var a uint = 0
+		r.runningCount = &a
+	}
+	*r.runningCount -= count
 }
 
 func (r *Runner) call(ctx context.Context, msg *nats.Msg) ([]byte, error) {

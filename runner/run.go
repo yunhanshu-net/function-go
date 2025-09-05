@@ -41,7 +41,17 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 	defer func() {
 		ticker.Stop()
 		// 使用统一的Shutdown函数而不是单独关闭资源
-		Shutdown()
+		//Shutdown()
+		//logger.Info(context.Background(), "开始执行系统关闭...")
+		//
+		//// 1. 先关闭Runner连接，包括NATS连接等
+		//if err := r.close(context.Background()); err != nil {
+		//	logger.Errorf(context.Background(), "关闭Runner连接失败: %v", err)
+		//}
+
+		// 2. 关闭所有数据库连接
+		//CloseAllDBs()
+
 	}()
 
 	for {
@@ -51,9 +61,15 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 			return
 		case <-ticker.C:
 			status := r.natsConn.Status()
+			logger.Infof(ctx, "status：%s running count %v\n", status, r.GetRunningCount())
+
 			if status != nats.CONNECTED {
-				logger.Errorf(ctx, "%v 当前连接不正常，已经自己释放连接，并结束进程", status)
-				return
+				if r.GetRunningCount() == 0 {
+					logger.Errorf(ctx, "%v 当前连接不正常，已经自己释放连接，已经结束进程", status)
+					return
+				} else {
+					logger.Errorf(ctx, "%v 当前连接不正常，还存在%v个任务在处理中，先处理完再退出", status, r.GetRunningCount())
+				}
 			}
 
 			if r.idle > 0 {

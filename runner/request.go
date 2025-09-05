@@ -15,6 +15,14 @@ import (
 
 // runRequest 执行请求
 func (r *Runner) runFunction(ctx context.Context, req *request.RunFunctionReq) (*response.RunFunctionResp, error) {
+
+	logger.Infof(ctx, "run function request %+v\n runningCount++", req)
+	r.AddRunningCount(1)
+	defer func() {
+		logger.Infof(ctx, "run function request %+v\n runningCount--", req)
+		r.SubRunningCount(1)
+	}()
+
 	router, exist := r.getRouter(req.Router, req.Method)
 	if !exist {
 		routersJSON, _ := json.Marshal(r.routerMap)

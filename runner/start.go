@@ -3,15 +3,11 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/yunhanshu-net/function-go/env"
 	"github.com/yunhanshu-net/pkg/logger"
 	"github.com/yunhanshu-net/pkg/x/jsonx"
+	"sync"
 )
 
 func writeJSON(el interface{}) {
@@ -89,7 +85,7 @@ func Run() error {
 // Shutdown 统一的资源关闭入口，处理所有资源的释放
 func Shutdown() {
 	shutdownOnce.Do(func() {
-		//logger.Info(context.Background(), "开始执行系统关闭...")
+		logger.Info(context.Background(), "开始执行系统关闭...")
 
 		// 1. 先关闭Runner连接，包括NATS连接等
 		if err := r.close(context.Background()); err != nil {
@@ -103,17 +99,4 @@ func Shutdown() {
 		// ...
 
 	})
-}
-
-// SetupSignalHandler 设置信号处理，捕获SIGINT、SIGTERM信号
-func SetupSignalHandler() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-c
-		logger.Infof(context.Background(), "收到信号: %v, 开始优雅退出...", sig)
-		Shutdown()
-		os.Exit(0)
-	}()
 }
