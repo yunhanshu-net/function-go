@@ -61,8 +61,6 @@ func (r *Runner) connectCmd(cmd *cobra.Command, args []string) {
 			return
 		case <-ticker.C:
 			status := r.natsConn.Status()
-			logger.Infof(ctx, "status：%s running count %v\n", status, r.GetRunningCount())
-
 			if status != nats.CONNECTED {
 				if r.GetRunningCount() == 0 {
 					logger.Errorf(ctx, "%v 当前连接不正常，已经自己释放连接，已经结束进程", status)

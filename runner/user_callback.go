@@ -654,32 +654,3 @@ func (r *Runner) _callback(ctx *Context, req *usercall.Request, resp response.Re
 
 	return nil
 }
-
-//func (r *Runner) _syscall(ctx *Context, req *syscall.Request, resp response.Response) error {
-//	s, err := __syscall(ctx, r, req)
-//	if err != nil {
-//		return err
-//	}
-//	return resp.Form(s.Data).Build()
-//}
-//func __syscall(ctx *Context, r *Runner, req *syscall.Request) (resp *syscall.Response, err error) {
-//	resp = new(syscall.Response)
-//
-//	if req.CallbackType == sysconsts.TypeCreateTables {
-//		tablesReq, ok := req.Data.(*syscall.OnCreateTablesReq)
-//		if !ok {
-//			err = fmt.Errorf("OnCreateTablesReq decode failed: %w", err)
-//			return resp, err
-//		}
-//		function, exist := r.getRouter(tablesReq.Router, tablesReq.Method)
-//		if !exist {
-//			return resp, fmt.Errorf("router not found: %s", tablesReq.Router)
-//		}
-//		err = function.CreateTables(ctx)
-//		if err != nil {
-//			return resp, err
-//		}
-//		resp.Data = "ok"
-//	}
-//	return resp, err
-//}
