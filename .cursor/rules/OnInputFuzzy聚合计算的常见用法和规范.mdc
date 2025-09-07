@@ -10,6 +10,72 @@ alwaysApply: true
 
 **Statistics**：在OnInputFuzzy回调中提供**前端实时聚合计算**和信息展示的功能。
 
+## 🚀 OnInputFuzzy回调优化版本
+
+### 三层查询逻辑（推荐使用）
+
+基于我们最新的实践，OnInputFuzzy回调应该使用以下三层查询逻辑：
+
+```go
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "field_name": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // 【当前场景】说明字段类型和是否支持聚合
+        // 【目标字段】明确说明为哪个请求结构体的哪个字段提供数据
+        var items []YourModel
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询
+            db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "正常").
+                Limit(20)
+        }
+        db.Find(&items)
+
+        // 构建返回数据
+        fuzzyItems := make([]*usercall.InputFuzzyItem, 0)
+        for _, item := range items {
+            fuzzyItems = append(fuzzyItems, &usercall.InputFuzzyItem{
+                Value: item.ID,
+                Label: fmt.Sprintf("%s - %s", item.Name, item.Description),
+                DisplayInfo: map[string]interface{}{
+                    "名称": item.Name,
+                    "描述": item.Description,
+                    "状态": item.Status,
+                },
+            })
+        }
+
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // 根据字段类型决定是否使用聚合计算
+                // 单选字段：只返回静态信息
+                // 多选/List字段：可以使用聚合计算
+            },
+            Values: fuzzyItems,
+        }, nil
+    },
+}
+```
+
+### 性能优化说明
+
+1. **单值查询**：`id = ?` + `Limit(1)` - 性能最优，适合单选字段
+2. **多值查询**：`id IN ?` - 适合批量查询，减少查询次数
+3. **模糊查询**：`LIKE` + `Limit(20)` - 控制结果数量，提升响应速度
+
+### 注释规范
+
+每个回调函数都应该包含：
+- **【当前场景】**：说明字段类型特征（单选/多选，是否聚合）
+- **【目标字段】**：明确说明为哪个请求结构体的哪个字段提供数据
+
 **工作原理**：
 - 用户在前端选择商品时，前端实时计算并展示统计信息
 - **关键**：聚合计算基于**用户当前选择的数据**，不是后端数据库的全量统计
@@ -203,15 +269,25 @@ var SimpleCashierDeskOption = &runner.FormFunctionOptions{
     // ================ 完整的OnInputFuzzy回调 ================
     OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
         "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-            keyword := fmt.Sprintf("%v", req.Value)
+            // 【当前场景】product_id是List内单选字段，支持聚合计算
+            // 【目标字段】为 SimpleCashierDeskReq.ProductQuantities[].ProductID 提供商品选择数据
             var products []SimpleCashierProduct
-
             db := ctx.MustGetOrInitDB()
-            db.Where("name LIKE ? OR code LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
-                Where("status = ?", "上架").
-                Where("stock > ?", 0).
-                Limit(20).
-                Find(&products)
+
+            if req.IsByFiledValues() {
+                // 多值查询：使用 IN 查询
+                db.Where("id in ?", req.GetFiledValues())
+            } else if req.IsByFiledValue() {
+                // 单值查询：使用等值查询，性能最优
+                db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            } else {
+                // 模糊查询：关键字搜索
+                db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                    Where("status = ?", "上架").
+                    Where("stock > ?", 0).
+                    Limit(20)
+            }
+            db.Find(&products)
 
             items := make([]*usercall.InputFuzzyItem, 0)
             for _, p := range products {
@@ -244,14 +320,24 @@ var SimpleCashierDeskOption = &runner.FormFunctionOptions{
         },
 
         "member_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-            keyword := fmt.Sprintf("%v", req.Value)
+            // 【当前场景】member_id是单选字段，只返回静态信息，不做聚合计算
+            // 【目标字段】为 SimpleCashierDeskReq.MemberId 提供会员卡选择数据
             var members []SimpleCashierMemberCard
-
             db := ctx.MustGetOrInitDB()
-            db.Where("card_number LIKE ? OR phone LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
-                Where("status = ?", "正常").
-                Limit(10).
-                Find(&members)
+
+            if req.IsByFiledValues() {
+                // 多值查询：使用 IN 查询
+                db.Where("id in ?", req.GetFiledValues())
+            } else if req.IsByFiledValue() {
+                // 单值查询：使用等值查询，性能最优
+                db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            } else {
+                // 模糊查询：关键字搜索
+                db.Where("card_number LIKE ? OR phone LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                    Where("status = ?", "正常").
+                    Limit(10)
+            }
+            db.Find(&members)
 
             items := make([]*usercall.InputFuzzyItem, 0)
             for _, m := range members {
@@ -266,7 +352,15 @@ var SimpleCashierDeskOption = &runner.FormFunctionOptions{
                 })
             }
 
-            return &usercall.OnInputFuzzyResp{Values: items}, nil
+            return &usercall.OnInputFuzzyResp{
+                Statistics: map[string]interface{}{
+                    // ✅ 单选场景：只返回有用的静态信息
+                    "会员折扣": "9折优惠",
+                    "配送说明": "满99元包邮",
+                    "客服电话": "400-123-4567",
+                },
+                Values: items,
+            }, nil
         },
     },
 }
@@ -296,7 +390,39 @@ type MultiProductReq struct {
 }
 
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
-    "product_ids": func(...) (*usercall.OnInputFuzzyResp, error) {
+    "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // 【当前场景】product_ids是多选字段，支持聚合计算
+        // 【目标字段】为 MultiProductReq.ProductIDs 提供商品多选数据
+        var products []Product
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询
+            db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "上架").
+                Limit(20)
+        }
+        db.Find(&products)
+
+        items := make([]*usercall.InputFuzzyItem, 0)
+        for _, p := range products {
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: p.ID,
+                Label: fmt.Sprintf("%s - ¥%.2f", p.Name, p.Price),
+                DisplayInfo: map[string]interface{}{
+                    "商品名称": p.Name,
+                    "价格":   p.Price,
+                    "库存":   p.Stock,
+                },
+            })
+        }
+
         return &usercall.OnInputFuzzyResp{
             Statistics: map[string]interface{}{
                 // ✅ 对用户有价值的聚合计算
@@ -308,6 +434,7 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
                 // ✅ 静态信息
                 "会员折扣": "9折优惠",
             },
+            Values: items,
         }, nil
     },
 }
@@ -325,7 +452,39 @@ type ProductSelectReq struct {
 }
 
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
-    "product_id": func(...) (*usercall.OnInputFuzzyResp, error) {
+    "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // 【当前场景】product_id是单选字段，只返回静态信息，不做聚合计算
+        // 【目标字段】为 ProductSelectReq.ProductID 提供商品选择数据
+        var products []Product
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询
+            db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "上架").
+                Limit(20)
+        }
+        db.Find(&products)
+
+        items := make([]*usercall.InputFuzzyItem, 0)
+        for _, p := range products {
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: p.ID,
+                Label: fmt.Sprintf("%s - ¥%.2f", p.Name, p.Price),
+                DisplayInfo: map[string]interface{}{
+                    "商品名称": p.Name,
+                    "价格":   p.Price,
+                    "库存":   p.Stock,
+                },
+            })
+        }
+
         return &usercall.OnInputFuzzyResp{
             Statistics: map[string]interface{}{
                 // ✅ 有价值的静态信息（不是聚合）
@@ -334,6 +493,7 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
                 "退换政策": "7天无理由退换",
                 "客服电话": "400-123-4567",
             },
+            Values: items,
         }, nil
     },
 }

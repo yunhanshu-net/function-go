@@ -6,7 +6,6 @@ replace github.com/yunhanshu-net/pkg => ../pkg
 
 require (
 	github.com/chai2010/webp v1.4.0
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/disintegration/imaging v1.6.2
 	github.com/go-playground/form/v4 v4.2.1
 	github.com/google/uuid v1.6.0

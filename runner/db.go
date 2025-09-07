@@ -39,21 +39,33 @@ func mustGetOrInitDB(dbName string) *gorm.DB {
 		logrus.Errorf("创建数据目录失败: %v", err)
 		panic(fmt.Errorf("创建数据目录失败: %v", err))
 	}
+	file, err := os.OpenFile(dataDir+"/gorm.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		panic(err)
+	}
 
-	// 设置GORM日志配置
-	gormLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
+	newLogger := logger.New(
+		log.New(file, "\r\n", log.LstdFlags), // 将日志写入文件
 		logger.Config{
-			SlowThreshold:             200 * time.Millisecond,
-			LogLevel:                  logger.Warn,
-			IgnoreRecordNotFoundError: true,
-			Colorful:                  false,
+			SlowThreshold: time.Second,
+			LogLevel:      logger.Info,
+			Colorful:      false,
 		},
 	)
+	//// 设置GORM日志配置
+	//gormLogger := logger.New(
+	//	log.New(os.Stdout, "\r\n", log.LstdFlags),
+	//	logger.Config{
+	//		SlowThreshold:             200 * time.Millisecond,
+	//		LogLevel:                  logger.Warn,
+	//		IgnoreRecordNotFoundError: true,
+	//		Colorful:                  false,
+	//	},
+	//)
 
 	// 创建数据库连接
 	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{
-		Logger: gormLogger,
+		Logger: newLogger,
 	})
 
 	if err != nil {
@@ -164,7 +176,7 @@ func sanitizeDBName(dbName string) string {
 
 // Context的mustGetOrInitDB方法
 func (c *Context) MustGetOrInitDB() *gorm.DB {
-	return mustGetOrInitDB(c.getDBName()).Session(&gorm.Session{})
+	return mustGetOrInitDB(c.getDBName())
 }
 
 func (c *Context) GetOrInitDB() (*gorm.DB, error) {

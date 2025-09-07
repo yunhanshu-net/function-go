@@ -1,0 +1,350 @@
+---
+description: OnInputFuzzy回调的最佳实践和优化版本，包含三层查询逻辑和性能优化
+globs:
+alwaysApply: true
+---
+
+# OnInputFuzzy回调最佳实践
+
+## 🎯 核心原则
+
+### 1. 三层查询逻辑（推荐使用）
+
+基于最新实践，OnInputFuzzy回调应该使用以下三层查询逻辑：
+
+```go
+OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+    "field_name": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+        // 【当前场景】说明字段类型和是否支持聚合
+        // 【目标字段】明确说明为哪个请求结构体的哪个字段提供数据
+        var items []YourModel
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "正常").
+                Limit(20)
+        }
+        db.Find(&items) // 最后统一执行查询
+
+        // 构建返回数据
+        fuzzyItems := make([]*usercall.InputFuzzyItem, 0)
+        for _, item := range items {
+            fuzzyItems = append(fuzzyItems, &usercall.InputFuzzyItem{
+                Value: item.ID,
+                Label: fmt.Sprintf("%s - %s", item.Name, item.Description),
+                DisplayInfo: map[string]interface{}{
+                    "名称": item.Name,
+                    "描述": item.Description,
+                    "状态": item.Status,
+                },
+            })
+        }
+
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                // 根据字段类型决定是否使用聚合计算
+                // 单选字段：只返回静态信息
+                // 多选/List字段：可以使用聚合计算
+            },
+            Values: fuzzyItems,
+        }, nil
+    },
+}
+```
+
+### 2. 性能优化说明
+
+| 查询类型 | SQL语句 | 性能特点 | 适用场景 |
+|---------|---------|----------|----------|
+| 单值查询 | `id = ?` + `Limit(1)` | 性能最优 | 单选字段，精确匹配 |
+| 多值查询 | `id IN ?` | 批量查询 | 多选字段，减少查询次数 |
+| 模糊查询 | `LIKE` + `Limit(20)` | 控制结果数量 | 关键字搜索，提升响应速度 |
+
+### 3. 注释规范
+
+每个回调函数都应该包含：
+
+```go
+// 【当前场景】field_name是单选字段，只返回静态信息，不做聚合计算
+// 【目标字段】为 YourRequest.FieldName 提供数据选择
+```
+
+**注释说明**：
+- **【当前场景】**：说明字段类型特征（单选/多选，是否聚合）
+- **【目标字段】**：明确说明为哪个请求结构体的哪个字段提供数据
+
+## 📝 具体实现示例
+
+### 1. 单选字段（不聚合）
+
+```go
+"doctor_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+    // 【当前场景】doctor_id是单选字段，只返回静态信息，不做聚合计算
+    // 【目标字段】为 HealthcarePrescriptionCreateReq.DoctorID 提供医生选择数据
+    var doctors []HealthcareMedicineDoctor
+    db := ctx.MustGetOrInitDB()
+
+    if req.IsByFiledValues() {
+        // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+        db = db.Where("id in ?", req.GetFiledValues())
+    } else if req.IsByFiledValue() {
+        // 单值查询：使用等值查询，性能最优
+        db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+    } else {
+        // 模糊查询：关键字搜索
+        db = db.Where("name LIKE ? OR title LIKE ? OR department LIKE ?",
+            "%"+req.Keyword()+"%", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+            Where("status = ?", "在职").
+            Limit(20)
+    }
+    db.Find(&doctors)
+
+    items := make([]*usercall.InputFuzzyItem, 0)
+    for _, d := range doctors {
+        items = append(items, &usercall.InputFuzzyItem{
+            Value: d.ID,
+            Label: fmt.Sprintf("%s - %s (%s)", d.Name, d.Title, d.Department),
+            DisplayInfo: map[string]interface{}{
+                "医生姓名": d.Name,
+                "职称":   d.Title,
+                "科室":   d.Department,
+                "联系电话": d.Phone,
+            },
+        })
+    }
+
+    return &usercall.OnInputFuzzyResp{
+        Statistics: map[string]interface{}{
+            // ✅ 单选场景：只返回有用的静态信息
+            "选课规则": "每学期最多选6门课程",
+            "退课政策": "开课前可退课",
+            "补选时间": "每学期第2周",
+        },
+        Values: items,
+    }, nil
+},
+```
+
+### 2. 多选字段（支持聚合）
+
+```go
+"product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+    // 【当前场景】product_ids是多选字段，支持聚合计算
+    // 【目标字段】为 MultiProductReq.ProductIDs 提供商品多选数据
+    var products []Product
+    db := ctx.MustGetOrInitDB()
+
+    if req.IsByFiledValues() {
+        // 多值查询：使用 IN 查询
+        db.Where("id in ?", req.GetFiledValues())
+    } else if req.IsByFiledValue() {
+        // 单值查询：使用等值查询，性能最优
+        db.Where("id = ?", req.GetFiledValue()).Limit(1)
+    } else {
+        // 模糊查询：关键字搜索
+        db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+            Where("status = ?", "上架").
+            Limit(20)
+    }
+    db.Find(&products)
+
+    items := make([]*usercall.InputFuzzyItem, 0)
+    for _, p := range products {
+        items = append(items, &usercall.InputFuzzyItem{
+            Value: p.ID,
+            Label: fmt.Sprintf("%s - ¥%.2f", p.Name, p.Price),
+            DisplayInfo: map[string]interface{}{
+                "商品名称": p.Name,
+                "价格":   p.Price,
+                "库存":   p.Stock,
+            },
+        })
+    }
+
+    return &usercall.OnInputFuzzyResp{
+        Statistics: map[string]interface{}{
+            // ✅ 多选场景：支持聚合计算
+            "选中商品数": "count(价格)",           // 选了几个商品
+            "选中商品总价": "sum(价格,*quantity)", // 总价格
+            "最低单价": "min(价格)",              // 选中商品中最便宜的
+            "平均单价": "avg(价格)",              // 选中商品平均价格
+            
+            // ✅ 静态信息
+            "会员折扣": "9折优惠",
+        },
+        Values: items,
+    }, nil
+},
+```
+
+### 3. List内字段（支持聚合）
+
+```go
+"product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+    // 【当前场景】product_id是List内单选字段，支持聚合计算
+    // 【目标字段】为 SimpleCashierDeskReq.ProductQuantities[].ProductID 提供商品选择数据
+    var products []SimpleCashierProduct
+    db := ctx.MustGetOrInitDB()
+
+    if req.IsByFiledValues() {
+        // 多值查询：使用 IN 查询
+        db.Where("id in ?", req.GetFiledValues())
+    } else if req.IsByFiledValue() {
+        // 单值查询：使用等值查询，性能最优
+        db.Where("id = ?", req.GetFiledValue()).Limit(1)
+    } else {
+        // 模糊查询：关键字搜索
+        db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+            Where("status = ?", "上架").
+            Where("stock > ?", 0).
+            Limit(20)
+    }
+    db.Find(&products)
+
+    items := make([]*usercall.InputFuzzyItem, 0)
+    for _, p := range products {
+        items = append(items, &usercall.InputFuzzyItem{
+            Value: p.ID,
+            Label: fmt.Sprintf("%s - ¥%.2f (库存:%d)", p.Name, p.Price, p.Stock),
+            DisplayInfo: map[string]interface{}{
+                "商品名称": p.Name,
+                "价格":   p.Price,
+                "库存":   p.Stock,
+            },
+        })
+    }
+
+    return &usercall.OnInputFuzzyResp{
+        Statistics: map[string]interface{}{
+            // ✅ List内字段：支持聚合计算
+            "商品原价(元)": "sum(价格,*quantity)",      // 用户选择的所有商品总价
+            "会员价格(元)": "sum(价格,*quantity,*0.9)",  // 会员9折后的总价
+            "优惠金额(元)": "sum(价格,*quantity,*0.1)",  // 节省的金额
+            "商品种类": "count(价格)",                  // 选了几种商品
+            "商品总数": "sum(quantity)",               // 商品总数量
+            
+            // ✅ 有用的静态信息
+            "会员折扣": "9折优惠",
+            "配送说明": "满99元包邮",
+        },
+        Values: items,
+    }, nil
+},
+```
+
+## ⚠️ 常见错误
+
+### 1. 单选字段强行聚合
+
+```go
+// ❌ 错误：单选字段使用聚合计算
+Statistics: map[string]interface{}{
+    "商品总数": "count(价格)",      // 永远显示1，毫无意义
+    "最低价格": "min(价格)",       // 永远是用户选的商品价格
+    "最高价格": "max(价格)",       // 永远是用户选的商品价格
+}
+
+// ✅ 正确：单选字段只返回静态信息
+Statistics: map[string]interface{}{
+    "配送方式": "顺丰快递",
+    "保质期": "12个月",
+    "退换政策": "7天无理由退换",
+}
+```
+
+### 2. 单选用IN查询
+
+```go
+// ❌ 错误：单选字段用IN查询
+if req.IsByFiledValues() {
+    db.Where("id in ?", req.GetFiledValues()) // 单选字段用IN效率低
+}
+
+// ✅ 正确：单选字段用等值查询
+if req.IsByFiledValue() {
+    db.Where("id = ?", req.GetFiledValue()).Limit(1) // 性能最优
+}
+```
+
+### 3. 缺少注释说明
+
+```go
+// ❌ 错误：缺少注释说明
+"field_name": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+    // 没有说明字段类型和目标
+}
+
+// ✅ 正确：包含完整注释
+"field_name": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+    // 【当前场景】field_name是单选字段，只返回静态信息，不做聚合计算
+    // 【目标字段】为 YourRequest.FieldName 提供数据选择
+}
+```
+
+## 🏆 最佳实践总结
+
+1. **使用三层查询逻辑**：`IsByFiledValues()` → `IsByFiledValue()` → 模糊查询
+2. **性能优化**：单值用等值查询，多值用IN查询，模糊查询加限制
+3. **注释规范**：每个回调都要说明场景和目标字段
+4. **聚合判断**：单选不聚合，多选/List才聚合
+5. **信息精简**：3-5个重要信息即可，避免信息过载
+
+## ⚠️ 重要陷阱：GORM链式调用
+
+### 问题代码（错误）
+```go
+db := ctx.MustGetOrInitDB()
+
+if req.IsByFiledValues() {
+    // ❌ 错误：没有重新赋值，条件不会生效
+    db.Where("id in ?", req.GetFiledValues())
+} else if req.IsByFiledValue() {
+    // ❌ 错误：没有重新赋值，条件不会生效
+    db.Where("id = ?", req.GetFiledValue()).Limit(1)
+} else {
+    // ❌ 错误：没有重新赋值，条件不会生效
+    db.Where("name LIKE ?", "%"+keyword+"%").Where("status = ?", "正常").Limit(20)
+}
+
+db.Find(&items) // 这里会查询所有数据，忽略上面的条件！
+```
+
+### 正确代码
+```go
+db := ctx.MustGetOrInitDB()
+
+if req.IsByFiledValues() {
+    // ✅ 正确：重新赋值，条件生效
+    db = db.Where("id in ?", req.GetFiledValues())
+} else if req.IsByFiledValue() {
+    // ✅ 正确：重新赋值，条件生效
+    db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+} else {
+    // ✅ 正确：重新赋值，条件生效
+    db = db.Where("name LIKE ?", "%"+keyword+"%").Where("status = ?", "正常").Limit(20)
+}
+
+db.Find(&items) // 这里会应用所有条件
+```
+
+### 为什么需要重新赋值？
+
+**GORM的链式调用特性**：
+- 每次调用 `Where()`、`Limit()` 等方法都会返回一个新的 `*gorm.DB` 实例
+- 不会修改原有的 `db` 变量
+- 必须将结果重新赋值给 `db` 变量，条件才会生效
+
+**记忆口诀**：`db = db.Where()` 而不是 `db.Where()`
+
+## 📚 相关文档
+
+- [OnInputFuzzy聚合计算的常见用法和规范](./OnInputFuzzy聚合计算的常见用法和规范.mdc)
+- [SFT数据构造规范-最佳实践](./SFT数据构造规范-最佳实践.mdc)

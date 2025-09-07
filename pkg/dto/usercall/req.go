@@ -3,6 +3,7 @@ package usercall
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yunhanshu-net/function-go/view/widget/types"
 	"strings"
 
 	"github.com/yunhanshu-net/pkg/x/jsonx"
@@ -84,10 +85,88 @@ type OnVersionChangeReq struct {
 }
 
 type OnInputFuzzyReq struct {
-	Code    string      `json:"code"`  //回调的这个字段的key
-	Value   interface{} `json:"value"` //用户输入的值
-	Request interface{} `json:"request"`
+	Code      string      `json:"code"`  //回调的这个字段的key
+	Value     interface{} `json:"value"` //用户输入的值
+	Request   interface{} `json:"request"`
+	InputType string      `json:"input_type"` //by_filed_value/by_filed_values
+	ValueType string      `json:"value_type"` //
+	keywork   string
 }
+
+func (r *OnInputFuzzyReq) GetFiledValues() interface{} {
+
+	switch r.ValueType {
+	case types.ValueFloat, types.ValueFloats:
+		switch r.Value.(type) {
+		case []interface{}:
+			var floats []float64
+			jsonx.Convert(r.Value, &floats)
+			return floats
+		}
+	case types.ValueNumber, types.ValueNumbers:
+		switch r.Value.(type) {
+		case []interface{}:
+			var ints []int
+			jsonx.Convert(r.Value, &ints)
+			return ints
+		}
+
+	case types.ValueString, types.ValueStrings:
+		switch r.Value.(type) {
+		case []interface{}:
+			var strs []string
+			jsonx.Convert(r.Value, &strs)
+			return strs
+		}
+	}
+
+	return r.Value
+}
+func (r *OnInputFuzzyReq) GetFiledValue() interface{} {
+
+	if r.ValueType == types.ValueNumber {
+		return int(r.Value.(float64))
+	}
+	return r.Value
+}
+
+//	func (r *OnInputFuzzyReq) IsByFieldValue() bool {
+//		return r.InputType == "by_filed_value"
+//	}
+func (r *OnInputFuzzyReq) IsByFiledValues() bool {
+	return r.InputType == "by_field_values"
+}
+func (r *OnInputFuzzyReq) IsByFiledValue() bool {
+	return r.InputType == "by_field_value"
+}
+
+func (r *OnInputFuzzyReq) Keyword() string {
+	if r.keywork == "" {
+		r.keywork = fmt.Sprintf("%s", r.Value)
+	}
+	return r.keywork
+}
+
+//func (r *OnInputFuzzyReq) ByID() int {
+//	//i, err := strconv.ParseInt(fmt.Sprintf("%s", r.Value), 10, 64)
+//	//if err != nil {
+//	//	return 0
+//	//}
+//	v, ok := r.Value.(int)
+//	if !ok {
+//		return v
+//	}
+//
+//	return 0
+//}
+
+//func (r *OnInputFuzzyReq) ByIDS() []int {
+//	ints, ok := r.Value.([]int)
+//	if !ok {
+//		return []int{0}
+//	}
+//	return ints
+//}
 
 func (c *OnInputFuzzyReq) DecodeBy(el interface{}) error {
 	err := jsonx.Convert(c.Request, el)
