@@ -68,11 +68,12 @@ type Message struct {
 
 // ChatRequest 聊天请求
 type ChatRequest struct {
-	Messages    []Message      `json:"messages"`          // 对话历史
-	Model       string         `json:"model"`             // 模型名称（可选）
-	MaxTokens   int            `json:"max_tokens"`        // 最大token数（可选）
-	Temperature float64        `json:"temperature"`       // 温度参数（可选）
-	Timeout     *time.Duration `json:"timeout,omitempty"` // 请求超时时间（可选，覆盖客户端默认超时）
+	Messages    []Message      `json:"messages"`               // 对话历史
+	Model       string         `json:"model"`                  // 模型名称（可选）
+	MaxTokens   int            `json:"max_tokens"`             // 最大token数（可选）
+	Temperature float64        `json:"temperature"`            // 温度参数（可选）
+	Timeout     *time.Duration `json:"timeout,omitempty"`      // 请求超时时间（可选，覆盖客户端默认超时）
+	UseThinking *bool          `json:"use_thinking,omitempty"` // 是否使用思考模式（可选，GLM特有功能）
 }
 
 // ChatResponse 聊天响应

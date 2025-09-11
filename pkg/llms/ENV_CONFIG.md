@@ -27,14 +27,34 @@ export QIANWEN_API_KEY="sk-75ff015dbdec41f0804cf0203f20a387"
 export DEEPSEEK_API_KEY="sk-1a8d81e59fc84205b42a3cf210ff49fc"
 ```
 
-### 3. 其他LLM (可选)
+### 3. GLM (智谱AI)
 
 ```bash
-# 豆包 (暂未实现)
+# 设置GLM API Key
+export GLM_API_KEY="your-glm-api-key"
+```
+
+**支持的模型**:
+- `glm-4.5` - 最强大的推理模型，3550亿参数
+- `glm-4.5-air` - 高性价比轻量级强性能
+- `glm-4.5-x` - 高性能强推理极速响应
+- `glm-4.5-airx` - 轻量级强性能极速响应
+- `glm-4.5-flash` - 免费高效多功能
+
+### 4. 其他LLM (可选)
+
+```bash
+# 豆包
 export DOUBAO_API_KEY="your-doubao-api-key"
 
-# Kimi (暂未实现)
+# Kimi
 export KIMI_API_KEY="your-kimi-api-key"
+
+# Claude
+export CLAUDE_API_KEY="your-claude-api-key"
+
+# Gemini
+export GEMINI_API_KEY="your-gemini-api-key"
 ```
 
 ## 🚀 使用方法
@@ -54,6 +74,22 @@ func main() {
     }
     
     // 使用客户端...
+}
+
+// GLM使用示例
+func glmExample() {
+    // 创建GLM客户端
+    client, err := llms.NewGLMClientFromEnv()
+    if err != nil {
+        panic(err)
+    }
+    
+    // 使用GLM特殊功能
+    glmClient := client.(*llms.GLMClient)
+    glmClient.SetModel("glm-4.5") // 设置模型
+    
+    // 使用思考模式
+    resp, err := glmClient.ChatWithThinking(ctx, req, true)
 }
 ```
 
@@ -82,10 +118,12 @@ if err != nil {
 # 临时设置 (当前会话有效)
 export QIANWEN_API_KEY="sk-75ff015dbdec41f0804cf0203f20a387"
 export DEEPSEEK_API_KEY="sk-1a8d81e59fc84205b42a3cf210ff49fc"
+export GLM_API_KEY="your-glm-api-key"
 
 # 永久设置 (添加到 ~/.bashrc 或 ~/.zshrc)
 echo 'export QIANWEN_API_KEY="sk-75ff015dbdec41f0804cf0203f20a387"' >> ~/.bashrc
 echo 'export DEEPSEEK_API_KEY="sk-1a8d81e59fc84205b42a3cf210ff49fc"' >> ~/.bashrc
+echo 'export GLM_API_KEY="your-glm-api-key"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -93,8 +131,9 @@ source ~/.bashrc
 
 ```cmd
 # 临时设置
-set DASHSCOPE_API_KEY=sk-75ff015dbdec41f0804cf0203f20a387
+set QIANWEN_API_KEY=sk-75ff015dbdec41f0804cf0203f20a387
 set DEEPSEEK_API_KEY=sk-1a8d81e59fc84205b42a3cf210ff49fc
+set GLM_API_KEY=your-glm-api-key
 
 # 永久设置 (系统环境变量)
 # 控制面板 -> 系统 -> 高级系统设置 -> 环境变量
@@ -104,8 +143,9 @@ set DEEPSEEK_API_KEY=sk-1a8d81e59fc84205b42a3cf210ff49fc
 
 ```dockerfile
 # Dockerfile
-ENV DASHSCOPE_API_KEY=sk-75ff015dbdec41f0804cf0203f20a387
+ENV QIANWEN_API_KEY=sk-75ff015dbdec41f0804cf0203f20a387
 ENV DEEPSEEK_API_KEY=sk-1a8d81e59fc84205b42a3cf210ff49fc
+ENV GLM_API_KEY=your-glm-api-key
 ```
 
 ```yaml
@@ -113,16 +153,18 @@ ENV DEEPSEEK_API_KEY=sk-1a8d81e59fc84205b42a3cf210ff49fc
 services:
   app:
     environment:
-      - DASHSCOPE_API_KEY=sk-75ff015dbdec41f0804cf0203f20a387
+      - QIANWEN_API_KEY=sk-75ff015dbdec41f0804cf0203f20a387
       - DEEPSEEK_API_KEY=sk-1a8d81e59fc84205b42a3cf210ff49fc
+      - GLM_API_KEY=your-glm-api-key
 ```
 
 ## 🧪 测试环境变量配置
 
 ```bash
 # 测试环境变量是否设置成功
-echo $DASHSCOPE_API_KEY
+echo $QIANWEN_API_KEY
 echo $DEEPSEEK_API_KEY
+echo $GLM_API_KEY
 
 # 运行环境变量测试
 go test -v -run TestEnvironmentVariableSupport
@@ -148,7 +190,7 @@ go test -v -run TestSameAPIKeyForQwen
 env | grep API_KEY
 
 # 重新设置环境变量
-export DASHSCOPE_API_KEY="sk-75ff015dbdec41f0804cf0203f20a387"
+export QIANWEN_API_KEY="sk-75ff015dbdec41f0804cf0203f20a387"
 ```
 
 ### 问题2: "API Key无效"

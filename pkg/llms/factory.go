@@ -16,6 +16,7 @@ const (
 	ProviderKimi       Provider = "kimi"
 	ProviderClaude     Provider = "claude"
 	ProviderGemini     Provider = "gemini"
+	ProviderGLM        Provider = "glm"
 )
 
 // NewLLMClient 创建LLM客户端
@@ -61,6 +62,8 @@ func NewLLMClientWithOptions(provider Provider, apiKey string, options *ClientOp
 		return NewClaudeClientWithOptions(apiKey, options), nil
 	case ProviderGemini:
 		return NewGeminiClientWithOptions(apiKey, options), nil
+	case ProviderGLM:
+		return NewGLMClientWithOptions(apiKey, options), nil
 	default:
 		return nil, fmt.Errorf("不支持的提供商: %s", provider)
 	}
@@ -82,6 +85,8 @@ func getAPIKeyFromEnv(provider Provider) string {
 		return os.Getenv("CLAUDE_API_KEY")
 	case ProviderGemini:
 		return os.Getenv("GEMINI_API_KEY")
+	case ProviderGLM:
+		return os.Getenv("GLM_API_KEY")
 	default:
 		return ""
 	}
@@ -127,6 +132,11 @@ func NewGeminiClientFromEnv() (LLMClient, error) {
 	return NewLLMClient(ProviderGemini, "")
 }
 
+// NewGLMClientFromEnv 从环境变量创建GLM客户端
+func NewGLMClientFromEnv() (LLMClient, error) {
+	return NewLLMClient(ProviderGLM, "")
+}
+
 // GetSupportedProviders 获取支持的提供商列表
 func GetSupportedProviders() []Provider {
 	return []Provider{
@@ -137,6 +147,7 @@ func GetSupportedProviders() []Provider {
 		ProviderKimi,
 		ProviderClaude,
 		ProviderGemini,
+		ProviderGLM,
 	}
 }
 
@@ -157,6 +168,8 @@ func GetProviderDisplayName(provider Provider) string {
 		return "Claude"
 	case ProviderGemini:
 		return "Gemini"
+	case ProviderGLM:
+		return "GLM"
 	default:
 		return string(provider)
 	}

@@ -17,8 +17,11 @@
 |--------|------|------|
 | DeepSeek | ✅ 已实现 | 代码生成能力强，推荐使用 |
 | 千问 | ✅ 已实现 | 中文理解好，价格便宜 |
-| 豆包 | ❌ 待实现 | 价格最便宜 |
-| Kimi | ❌ 待实现 | 基础功能支持 |
+| 豆包 | ✅ 已实现 | 字节跳动出品，价格便宜 |
+| Kimi | ✅ 已实现 | 月之暗面出品，长文本处理强 |
+| Claude | ✅ 已实现 | Anthropic出品，推理能力强 |
+| Gemini | ✅ 已实现 | Google出品，多模态支持 |
+| GLM | ✅ 已实现 | 智谱AI出品，GLM-4.5系列，思考模式 |
 
 ## 快速开始
 
@@ -129,6 +132,11 @@ client, err := llms.NewLLMClient(llms.ProviderQwen, "your-qwen-api-key")
 ```bash
 export DEEPSEEK_API_KEY="your-api-key"
 export QWEN_API_KEY="your-api-key"
+export DOUBAO_API_KEY="your-api-key"
+export KIMI_API_KEY="your-api-key"
+export CLAUDE_API_KEY="your-api-key"
+export GEMINI_API_KEY="your-api-key"
+export GLM_API_KEY="your-api-key"
 ```
 
 ## API参考
@@ -228,6 +236,50 @@ func (n *NewProviderClient) GetProvider() string {
 // 在factory.go中添加
 case ProviderNewProvider:
     return NewNewProviderClient(apiKey), nil
+```
+
+## GLM 特殊功能
+
+### 思考模式
+
+GLM-4.5 系列支持深度思考模式，可以通过 `thinking.type` 参数控制：
+
+```go
+// 创建GLM客户端
+client, err := llms.NewLLMClient(llms.ProviderGLM, "your-glm-api-key")
+if err != nil {
+    log.Fatal(err)
+}
+
+// 设置模型
+glmClient := client.(*llms.GLMClient)
+glmClient.SetModel("glm-4.5") // 或 glm-4.5-air, glm-4.5-x 等
+
+// 使用思考模式
+resp, err := glmClient.ChatWithThinking(ctx, req, true) // 启用思考模式
+```
+
+### 支持的模型
+
+GLM-4.5 系列提供多个模型选择：
+
+- `glm-4.5`: 最强大的推理模型，3550亿参数
+- `glm-4.5-air`: 高性价比轻量级强性能
+- `glm-4.5-x`: 高性能强推理极速响应
+- `glm-4.5-airx`: 轻量级强性能极速响应
+- `glm-4.5-flash`: 免费高效多功能
+
+```go
+// 获取支持的模型列表
+models := glmClient.GetSupportedModels()
+for _, model := range models {
+    fmt.Printf("支持模型: %s\n", model)
+}
+
+// 检查思考模式支持
+if glmClient.IsThinkingEnabled() {
+    fmt.Println("当前模型支持思考模式")
+}
 ```
 
 ## 最佳实践
