@@ -27,12 +27,12 @@ type ClientOptions struct {
 // DefaultClientOptions 返回默认的客户端配置
 func DefaultClientOptions() *ClientOptions {
 	return &ClientOptions{
-		Timeout:         60 * time.Second, // 默认60秒超时
-		MaxIdleConns:    10,               // 默认10个空闲连接
-		IdleConnTimeout: 90 * time.Second, // 默认90秒空闲超时
-		MaxRetries:      0,                // 默认不重试
-		RetryDelay:      1 * time.Second,  // 默认1秒重试延迟
-		EnableLogging:   false,            // 默认不启用日志
+		Timeout:         1200 * time.Second, // 默认1200秒超时（20分钟）
+		MaxIdleConns:    10,                 // 默认10个空闲连接
+		IdleConnTimeout: 90 * time.Second,   // 默认90秒空闲超时
+		MaxRetries:      0,                  // 默认不重试
+		RetryDelay:      1 * time.Second,    // 默认1秒重试延迟
+		EnableLogging:   false,              // 默认不启用日志
 	}
 }
 
@@ -90,10 +90,21 @@ type Usage struct {
 	TotalTokens      int `json:"total_tokens"`      // 总token数
 }
 
+// StreamChunk 流式响应数据块
+type StreamChunk struct {
+	Content string `json:"content"`         // 流式内容片段
+	Done    bool   `json:"done"`            // 是否完成
+	Error   string `json:"error,omitempty"` // 错误信息（如果有）
+	Usage   *Usage `json:"usage,omitempty"` // 使用统计（完成时提供）
+}
+
 // LLMClient 大模型客户端接口
 type LLMClient interface {
 	// Chat 核心方法：根据对话列表返回AI回答
 	Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error)
+
+	// ChatStream 流式聊天方法：返回流式响应通道
+	ChatStream(ctx context.Context, req *ChatRequest) (<-chan *StreamChunk, error)
 
 	// GetModelName 获取模型名称
 	GetModelName() string

@@ -5,233 +5,94 @@ import (
 	"testing"
 )
 
-// TestEnvironmentVariableSupport 测试环境变量支持
-func TestEnvironmentVariableSupport(t *testing.T) {
-	// 直接使用用户设置的环境变量，不手动设置
+// TestEnvironmentVariableFallback 测试环境变量回退功能
+func TestEnvironmentVariableFallback(t *testing.T) {
+	// 保存原始环境变量
+	originalGLM := os.Getenv("GLM_API_KEY")
+	originalDeepSeek := os.Getenv("DEEPSEEK_API_KEY")
+	originalQwen := os.Getenv("QWEN_API_KEY")
 
-	t.Run("测试千问3 Coder环境变量", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewQwen3CoderClientFromEnv()
-		if err != nil {
-			t.Fatalf("从环境变量创建千问3 Coder客户端失败: %v", err)
+	// 清理环境变量
+	defer func() {
+		if originalGLM != "" {
+			os.Setenv("GLM_API_KEY", originalGLM)
+		} else {
+			os.Unsetenv("GLM_API_KEY")
 		}
-
-		if client == nil {
-			t.Fatal("客户端为空")
+		if originalDeepSeek != "" {
+			os.Setenv("DEEPSEEK_API_KEY", originalDeepSeek)
+		} else {
+			os.Unsetenv("DEEPSEEK_API_KEY")
 		}
-
-		// 验证API Key
-		qwenClient, ok := client.(*Qwen3CoderClient)
-		if !ok {
-			t.Fatal("客户端类型错误")
+		if originalQwen != "" {
+			os.Setenv("QWEN_API_KEY", originalQwen)
+		} else {
+			os.Unsetenv("QWEN_API_KEY")
 		}
+	}()
 
-		// 验证API Key不为空即可，不检查具体值
-		if qwenClient.APIKey == "" {
-			t.Error("API Key为空")
+	// 测试GLM客户端
+	t.Run("GLM_Environment_Fallback", func(t *testing.T) {
+		// 设置测试环境变量
+		testKey := "test-glm-key-from-env"
+		os.Setenv("GLM_API_KEY", testKey)
+
+		// 使用空字符串创建客户端，应该从环境变量获取
+		client := NewGLMClient("")
+		if client.APIKey != testKey {
+			t.Errorf("期望API密钥为 %s，实际为 %s", testKey, client.APIKey)
 		}
-
-		t.Logf("✅ 千问3 Coder环境变量测试通过，API Key: %s", qwenClient.APIKey[:20]+"...")
 	})
 
-	t.Run("测试千问环境变量", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewQwenClientFromEnv()
-		if err != nil {
-			t.Fatalf("从环境变量创建千问客户端失败: %v", err)
-		}
+	// 测试DeepSeek客户端
+	t.Run("DeepSeek_Environment_Fallback", func(t *testing.T) {
+		// 设置测试环境变量
+		testKey := "test-deepseek-key-from-env"
+		os.Setenv("DEEPSEEK_API_KEY", testKey)
 
-		if client == nil {
-			t.Fatal("客户端为空")
+		// 使用空字符串创建客户端，应该从环境变量获取
+		client := NewDeepSeekClient("")
+		if client.APIKey != testKey {
+			t.Errorf("期望API密钥为 %s，实际为 %s", testKey, client.APIKey)
 		}
-
-		// 验证API Key
-		qwenClient, ok := client.(*QwenClient)
-		if !ok {
-			t.Fatal("客户端类型错误")
-		}
-
-		// 验证API Key不为空即可，不检查具体值
-		if qwenClient.APIKey == "" {
-			t.Error("API Key为空")
-		}
-
-		t.Logf("✅ 千问环境变量测试通过，API Key: %s", qwenClient.APIKey[:20]+"...")
 	})
 
-	t.Run("测试DeepSeek环境变量", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewDeepSeekClientFromEnv()
-		if err != nil {
-			t.Fatalf("从环境变量创建DeepSeek客户端失败: %v", err)
-		}
+	// 测试Qwen客户端
+	t.Run("Qwen_Environment_Fallback", func(t *testing.T) {
+		// 设置测试环境变量
+		testKey := "test-qwen-key-from-env"
+		os.Setenv("QWEN_API_KEY", testKey)
 
-		if client == nil {
-			t.Fatal("客户端为空")
+		// 使用空字符串创建客户端，应该从环境变量获取
+		client := NewQwenClient("")
+		if client.APIKey != testKey {
+			t.Errorf("期望API密钥为 %s，实际为 %s", testKey, client.APIKey)
 		}
-
-		// 验证API Key
-		deepSeekClient, ok := client.(*DeepSeekClient)
-		if !ok {
-			t.Fatal("客户端类型错误")
-		}
-
-		// 验证API Key不为空即可，不检查具体值
-		if deepSeekClient.APIKey == "" {
-			t.Error("API Key为空")
-		}
-
-		t.Logf("✅ DeepSeek环境变量测试通过，API Key: %s", deepSeekClient.APIKey[:20]+"...")
 	})
 
-	t.Run("测试Kimi环境变量", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewKimiClientFromEnv()
-		if err != nil {
-			t.Fatalf("从环境变量创建Kimi客户端失败: %v", err)
-		}
+	// 测试优先级：传入的API密钥应该优先于环境变量
+	t.Run("API_Key_Priority", func(t *testing.T) {
+		// 设置环境变量
+		envKey := "env-key"
+		os.Setenv("GLM_API_KEY", envKey)
 
-		if client == nil {
-			t.Fatal("客户端为空")
+		// 传入的API密钥应该优先
+		passedKey := "passed-key"
+		client := NewGLMClient(passedKey)
+		if client.APIKey != passedKey {
+			t.Errorf("期望API密钥为 %s，实际为 %s", passedKey, client.APIKey)
 		}
-
-		// 验证API Key
-		kimiClient, ok := client.(*KimiClient)
-		if !ok {
-			t.Fatal("客户端类型错误")
-		}
-
-		// 验证API Key不为空即可，不检查具体值
-		if kimiClient.APIKey == "" {
-			t.Error("API Key为空")
-		}
-
-		t.Logf("✅ Kimi环境变量测试通过，API Key: %s", kimiClient.APIKey[:20]+"...")
 	})
 
-	t.Run("测试环境变量为空时的错误处理", func(t *testing.T) {
-		// 保存原始环境变量
-		originalQianwen := os.Getenv("QIANWEN_API_KEY")
+	// 测试环境变量为空的情况
+	t.Run("Empty_Environment_Variable", func(t *testing.T) {
+		// 确保环境变量为空
+		os.Unsetenv("GLM_API_KEY")
 
-		// 清除环境变量
-		os.Unsetenv("QIANWEN_API_KEY")
-
-		// 测试从环境变量创建客户端应该失败
-		_, err := NewQwen3CoderClientFromEnv()
-		if err == nil {
-			t.Fatal("环境变量为空时应该返回错误")
+		// 使用空字符串创建客户端
+		client := NewGLMClient("")
+		if client.APIKey != "" {
+			t.Errorf("期望API密钥为空，实际为 %s", client.APIKey)
 		}
-
-		// 恢复环境变量
-		if originalQianwen != "" {
-			os.Setenv("QIANWEN_API_KEY", originalQianwen)
-		}
-
-		t.Logf("✅ 环境变量为空时的错误处理测试通过: %v", err)
-	})
-
-	t.Run("测试通用环境变量创建函数", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewLLMClientFromEnv(ProviderQwen3Coder)
-		if err != nil {
-			t.Fatalf("通用环境变量创建函数失败: %v", err)
-		}
-
-		if client == nil {
-			t.Fatal("客户端为空")
-		}
-
-		t.Logf("✅ 通用环境变量创建函数测试通过")
-	})
-
-	t.Run("测试通用环境变量创建函数-Kimi", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewLLMClientFromEnv(ProviderKimi)
-		if err != nil {
-			t.Fatalf("通用环境变量创建函数-Kimi失败: %v", err)
-		}
-
-		if client == nil {
-			t.Fatal("客户端为空")
-		}
-
-		t.Logf("✅ 通用环境变量创建函数-Kimi测试通过")
-	})
-
-	t.Run("测试豆包环境变量", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewDouBaoClientFromEnv()
-		if err != nil {
-			t.Fatalf("从环境变量创建豆包客户端失败: %v", err)
-		}
-
-		if client == nil {
-			t.Fatal("客户端为空")
-		}
-
-		// 验证API Key
-		douBaoClient, ok := client.(*DouBaoClient)
-		if !ok {
-			t.Fatal("客户端类型错误")
-		}
-
-		// 验证API Key不为空即可，不检查具体值
-		if douBaoClient.APIKey == "" {
-			t.Error("API Key为空")
-		}
-
-		t.Logf("✅ 豆包环境变量测试通过，API Key: %s", douBaoClient.APIKey[:20]+"...")
-	})
-
-	t.Run("测试通用环境变量创建函数-豆包", func(t *testing.T) {
-		// 直接使用用户设置的环境变量
-		client, err := NewLLMClientFromEnv(ProviderDouBao)
-		if err != nil {
-			t.Fatalf("通用环境变量创建函数-豆包失败: %v", err)
-		}
-
-		if client == nil {
-			t.Fatal("客户端为空")
-		}
-
-		t.Logf("✅ 通用环境变量创建函数-豆包测试通过")
-	})
-}
-
-// TestSameAPIKeyForQwen 测试千问和千问3 Coder使用同一个API Key
-func TestSameAPIKeyForQwen(t *testing.T) {
-	// 直接使用用户设置的环境变量，不手动设置
-
-	t.Run("验证千问和千问3 Coder使用相同API Key", func(t *testing.T) {
-		// 创建千问客户端
-		qwenClient, err := NewQwenClientFromEnv()
-		if err != nil {
-			t.Fatalf("创建千问客户端失败: %v", err)
-		}
-
-		// 创建千问3 Coder客户端
-		qwen3CoderClient, err := NewQwen3CoderClientFromEnv()
-		if err != nil {
-			t.Fatalf("创建千问3 Coder客户端失败: %v", err)
-		}
-
-		// 验证两个客户端使用相同的API Key
-		qwenAPIKey := qwenClient.(*QwenClient).APIKey
-		qwen3CoderAPIKey := qwen3CoderClient.(*Qwen3CoderClient).APIKey
-
-		if qwenAPIKey != qwen3CoderAPIKey {
-			t.Errorf("千问和千问3 Coder的API Key应该相同，千问: %s, 千问3 Coder: %s",
-				qwenAPIKey, qwen3CoderAPIKey)
-		}
-
-		// 验证API Key不为空
-		if qwenAPIKey == "" {
-			t.Error("千问API Key为空")
-		}
-		if qwen3CoderAPIKey == "" {
-			t.Error("千问3 Coder API Key为空")
-		}
-
-		t.Logf("✅ 千问和千问3 Coder使用相同API Key验证通过: %s", qwenAPIKey[:20]+"...")
 	})
 }

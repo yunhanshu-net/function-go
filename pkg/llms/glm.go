@@ -1,11 +1,15 @@
 package llms
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/yunhanshu-net/pkg/logger"
 )
@@ -53,6 +57,28 @@ type GLMAPIResponse struct {
 	} `json:"usage,omitempty"`
 }
 
+// GLMStreamResponse GLM 流式响应结构体
+type GLMStreamResponse struct {
+	Error *struct {
+		Code    string      `json:"code"`
+		Message string      `json:"message"`
+		Param   interface{} `json:"param"`
+		Type    string      `json:"type"`
+	} `json:"error,omitempty"`
+	Choices []struct {
+		Delta struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+		} `json:"delta"`
+		FinishReason string `json:"finish_reason,omitempty"`
+	} `json:"choices,omitempty"`
+	Usage *struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage,omitempty"`
+}
+
 // GLMClient GLM客户端实现
 type GLMClient struct {
 	APIKey  string         `json:"api_key"`
@@ -63,6 +89,10 @@ type GLMClient struct {
 
 // NewGLMClient 创建GLM客户端（保持向后兼容）
 func NewGLMClient(apiKey string) *GLMClient {
+	// 如果传入的apiKey为空，尝试从环境变量获取
+	if apiKey == "" {
+		apiKey = os.Getenv("GLM_API_KEY")
+	}
 	return NewGLMClientWithOptions(apiKey, DefaultClientOptions())
 }
 
@@ -70,6 +100,9 @@ func NewGLMClient(apiKey string) *GLMClient {
 func NewGLMClientWithOptions(apiKey string, options *ClientOptions) *GLMClient {
 	if options == nil {
 		options = DefaultClientOptions()
+	}
+	if apiKey == "" {
+		apiKey = os.Getenv("GLM_API_KEY")
 	}
 
 	baseURL := options.BaseURL
@@ -174,8 +207,10 @@ func (g *GLMClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, 
 		logger.Errorf(ctx, "[GLM] 发送请求到:%s 请求体: %s\n", g.BaseURL, string(jsonData))
 	}
 
+	logger.Infof(ctx, "[GLM] 发送HTTP请求到: %s, API Key长度: %d", g.BaseURL, len(g.APIKey))
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
+		logger.Errorf(ctx, "[GLM] HTTP请求失败: %v", err)
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
 	defer resp.Body.Close()
@@ -379,4 +414,214 @@ func (g *GLMClient) IsThinkingEnabled() bool {
 		}
 	}
 	return false
+}
+
+// ChatStream 实现流式聊天接口
+func (g *GLMClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *StreamChunk, error) {
+	// 创建流式响应通道
+	chunkChan := make(chan *StreamChunk, 10) // 缓冲通道，避免阻塞
+
+	// 在goroutine中处理流式请求
+	go func() {
+		defer close(chunkChan)
+
+		// 构造GLM API请求
+		apiReq := GLMAPIRequest{
+			Model:       req.Model,
+			Messages:    req.Messages,
+			MaxTokens:   req.MaxTokens,
+			Temperature: req.Temperature,
+			Stream:      true, // 启用流式
+			Thinking: &GLMThinkingConfig{
+				Type: "enabled", // 默认启用思考模式
+			},
+		}
+
+		// 设置默认值
+		if apiReq.Model == "" {
+			apiReq.Model = g.Model
+		}
+		if apiReq.MaxTokens <= 0 {
+			apiReq.MaxTokens = 4096
+		}
+		if apiReq.Temperature == 0 {
+			apiReq.Temperature = 0.6
+		}
+
+		// 根据请求参数控制思考模式
+		if req.UseThinking != nil {
+			if *req.UseThinking {
+				apiReq.Thinking.Type = "enabled"
+			} else {
+				apiReq.Thinking.Type = "disabled"
+			}
+		}
+
+		// 动态创建HTTP客户端，支持请求级别的超时配置
+		timeout := g.Options.Timeout
+		if req.Timeout != nil && *req.Timeout > 0 {
+			timeout = *req.Timeout
+		}
+
+		httpClient := &http.Client{
+			Timeout: timeout,
+			Transport: &http.Transport{
+				MaxIdleConns:       g.Options.MaxIdleConns,
+				IdleConnTimeout:    g.Options.IdleConnTimeout,
+				DisableCompression: true,
+			},
+		}
+
+		// 序列化请求
+		jsonData, err := json.Marshal(apiReq)
+		if err != nil {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("序列化请求失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+
+		// 记录请求日志
+		if g.Options != nil && g.Options.EnableLogging {
+			logger.Infof(ctx, "[GLM] 流式请求: %s", string(jsonData))
+		}
+
+		// 创建HTTP请求
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", g.BaseURL, bytes.NewBuffer(jsonData))
+		if err != nil {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("创建HTTP请求失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+
+		// 设置请求头
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+g.APIKey)
+		if g.Options.UserAgent != "" {
+			httpReq.Header.Set("User-Agent", g.Options.UserAgent)
+		}
+
+		// 发送请求
+		logger.Infof(ctx, "[GLM] 发送HTTP请求到: %s, API Key长度: %d", g.BaseURL, len(g.APIKey))
+		resp, err := httpClient.Do(httpReq)
+		if err != nil {
+			logger.Errorf(ctx, "[GLM] HTTP请求失败: %v", err)
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("HTTP请求失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+		defer resp.Body.Close()
+
+		// 检查HTTP状态码
+		logger.Infof(ctx, "[GLM] HTTP响应状态码: %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			// 读取响应体获取详细错误信息
+			body, _ := io.ReadAll(resp.Body)
+			logger.Errorf(ctx, "[GLM] HTTP请求失败，状态码: %d, 响应体: %s", resp.StatusCode, string(body))
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("HTTP请求失败，状态码: %d", resp.StatusCode),
+				Done:  true,
+			}
+			return
+		}
+
+		// 解析流式响应 - GLM使用SSE格式
+		scanner := bufio.NewScanner(resp.Body)
+		var finalUsage *Usage
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			// 跳过SSE格式的注释行和空行
+			if line == "" || strings.HasPrefix(line, ":") {
+				continue
+			}
+
+			// 处理SSE数据行
+			if strings.HasPrefix(line, "data: ") {
+				data := strings.TrimPrefix(line, "data: ")
+
+				// 检查是否是结束标记
+				if data == "[DONE]" {
+					chunkChan <- &StreamChunk{
+						Usage: finalUsage,
+						Done:  true,
+					}
+					break
+				}
+
+				// 解析JSON数据
+				var streamResp GLMStreamResponse
+				if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+					chunkChan <- &StreamChunk{
+						Error: fmt.Sprintf("解析流式响应失败: %v", err),
+						Done:  true,
+					}
+					return
+				}
+
+				// 检查错误
+				if streamResp.Error != nil {
+					chunkChan <- &StreamChunk{
+						Error: fmt.Sprintf("GLM API错误: %s - %s", streamResp.Error.Code, streamResp.Error.Message),
+						Done:  true,
+					}
+					return
+				}
+
+				// 处理选择内容
+				if len(streamResp.Choices) > 0 {
+					choice := streamResp.Choices[0]
+
+					// 发送内容片段 - 优先使用reasoning_content（思考过程），其次使用content
+					content := choice.Delta.ReasoningContent
+					if content == "" {
+						content = choice.Delta.Content
+					}
+
+					if content != "" {
+						chunkChan <- &StreamChunk{
+							Content: content,
+							Done:    false,
+						}
+					}
+
+					// 检查是否完成
+					if choice.FinishReason != "" {
+						// 保存使用统计
+						if streamResp.Usage != nil {
+							finalUsage = &Usage{
+								PromptTokens:     streamResp.Usage.PromptTokens,
+								CompletionTokens: streamResp.Usage.CompletionTokens,
+								TotalTokens:      streamResp.Usage.TotalTokens,
+							}
+						}
+
+						// 发送完成信号
+						chunkChan <- &StreamChunk{
+							Usage: finalUsage,
+							Done:  true,
+						}
+						break
+					}
+				}
+			}
+		}
+
+		// 检查scanner是否有错误
+		if err := scanner.Err(); err != nil {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("读取流式响应失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+	}()
+
+	return chunkChan, nil
 }

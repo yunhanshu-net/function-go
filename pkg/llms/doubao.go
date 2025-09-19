@@ -196,6 +196,23 @@ func (c *DouBaoClient) GetProvider() string {
 	return "DouBao"
 }
 
+// ChatStream 实现流式聊天接口
+func (c *DouBaoClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *StreamChunk, error) {
+	// 创建流式响应通道
+	chunkChan := make(chan *StreamChunk, 1)
+
+	// 在goroutine中处理
+	go func() {
+		defer close(chunkChan)
+		chunkChan <- &StreamChunk{
+			Error: "豆包 客户端暂不支持流式响应，请使用 Chat 方法",
+			Done:  true,
+		}
+	}()
+
+	return chunkChan, nil
+}
+
 // GetSupportedModels 获取支持的模型列表
 func (c *DouBaoClient) GetSupportedModels() []string {
 	return []string{

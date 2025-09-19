@@ -6,7 +6,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 )
+
+// QwenStreamResponse 千问流式响应结构体
+type QwenStreamResponse struct {
+	Output struct {
+		Text         string `json:"text"`
+		FinishReason string `json:"finish_reason,omitempty"`
+	} `json:"output"`
+	Usage *struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+		TotalTokens  int `json:"total_tokens"`
+	} `json:"usage,omitempty"`
+	Error *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
 
 // QwenClient 千问客户端实现
 type QwenClient struct {
@@ -17,6 +35,10 @@ type QwenClient struct {
 
 // NewQwenClient 创建千问客户端（保持向后兼容）
 func NewQwenClient(apiKey string) *QwenClient {
+	// 如果传入的apiKey为空，尝试从环境变量获取
+	if apiKey == "" {
+		apiKey = os.Getenv("QIANWEN_API_KEY")
+	}
 	return NewQwenClientWithOptions(apiKey, DefaultClientOptions())
 }
 
@@ -156,6 +178,168 @@ func (q *QwenClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse,
 	return &ChatResponse{
 		Content: content,
 	}, nil
+}
+
+// ChatStream 实现流式聊天接口
+func (q *QwenClient) ChatStream(ctx context.Context, req *ChatRequest) (<-chan *StreamChunk, error) {
+	// 创建流式响应通道
+	chunkChan := make(chan *StreamChunk, 10) // 缓冲通道，避免阻塞
+
+	// 在goroutine中处理流式请求
+	go func() {
+		defer close(chunkChan)
+
+		// 构造千问API请求 - 修复格式
+		modelName := req.Model
+		if modelName == "" {
+			modelName = "qwen-turbo"
+		}
+
+		maxTokens := req.MaxTokens
+		if maxTokens <= 0 {
+			maxTokens = 4000
+		}
+
+		temperature := req.Temperature
+		if temperature == 0 {
+			temperature = 0.7
+		}
+
+		apiReq := map[string]interface{}{
+			"model": modelName,
+			"input": map[string]interface{}{
+				"messages": req.Messages,
+			},
+			"parameters": map[string]interface{}{
+				"max_tokens":  maxTokens,
+				"temperature": temperature,
+				"stream":      true, // 启用流式
+			},
+		}
+
+		// 动态创建HTTP客户端，支持请求级别的超时配置
+		timeout := q.Options.Timeout
+		if req.Timeout != nil && *req.Timeout > 0 {
+			timeout = *req.Timeout
+		}
+
+		httpClient := &http.Client{
+			Timeout: timeout,
+			Transport: &http.Transport{
+				MaxIdleConns:       q.Options.MaxIdleConns,
+				IdleConnTimeout:    q.Options.IdleConnTimeout,
+				DisableCompression: true,
+			},
+		}
+
+		// 序列化请求
+		jsonData, err := json.Marshal(apiReq)
+		if err != nil {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("序列化请求失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+
+		// 创建HTTP请求
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", q.BaseURL, bytes.NewBuffer(jsonData))
+		if err != nil {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("创建HTTP请求失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+
+		// 设置请求头
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+q.APIKey)
+		if q.Options.UserAgent != "" {
+			httpReq.Header.Set("User-Agent", q.Options.UserAgent)
+		}
+
+		// 发送请求
+		resp, err := httpClient.Do(httpReq)
+		if err != nil {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("HTTP请求失败: %v", err),
+				Done:  true,
+			}
+			return
+		}
+		defer resp.Body.Close()
+
+		// 检查HTTP状态码
+		if resp.StatusCode != http.StatusOK {
+			chunkChan <- &StreamChunk{
+				Error: fmt.Sprintf("HTTP请求失败，状态码: %d", resp.StatusCode),
+				Done:  true,
+			}
+			return
+		}
+
+		// 解析流式响应
+		decoder := json.NewDecoder(resp.Body)
+		var finalUsage *Usage
+
+		for {
+			var streamResp QwenStreamResponse
+			if err := decoder.Decode(&streamResp); err != nil {
+				if err.Error() == "EOF" {
+					// 流结束，发送最终的使用统计
+					chunkChan <- &StreamChunk{
+						Usage: finalUsage,
+						Done:  true,
+					}
+					break
+				}
+				chunkChan <- &StreamChunk{
+					Error: fmt.Sprintf("解析流式响应失败: %v", err),
+					Done:  true,
+				}
+				return
+			}
+
+			// 检查错误
+			if streamResp.Error != nil {
+				chunkChan <- &StreamChunk{
+					Error: fmt.Sprintf("千问API错误: %s - %s", streamResp.Error.Code, streamResp.Error.Message),
+					Done:  true,
+				}
+				return
+			}
+
+			// 发送内容片段
+			if streamResp.Output.Text != "" {
+				chunkChan <- &StreamChunk{
+					Content: streamResp.Output.Text,
+					Done:    false,
+				}
+			}
+
+			// 检查是否完成
+			if streamResp.Output.FinishReason != "" {
+				// 保存使用统计
+				if streamResp.Usage != nil {
+					finalUsage = &Usage{
+						PromptTokens:     streamResp.Usage.InputTokens,
+						CompletionTokens: streamResp.Usage.OutputTokens,
+						TotalTokens:      streamResp.Usage.TotalTokens,
+					}
+				}
+
+				// 发送完成信号
+				chunkChan <- &StreamChunk{
+					Usage: finalUsage,
+					Done:  true,
+				}
+				break
+			}
+		}
+	}()
+
+	return chunkChan, nil
 }
 
 // GetModelName 获取模型名称
