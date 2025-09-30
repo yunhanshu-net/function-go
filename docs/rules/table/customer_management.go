@@ -35,14 +35,14 @@ func (c *Customer) TableName() string {
 
 // CustomerListReq 请求结构体
 type CustomerListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // CustomerList 客户列表处理逻辑
 func CustomerList(ctx *runner.Context, req *CustomerListReq, resp response.Response) error {
 	db := ctx.MustGetOrInitDB()
 	var customers []Customer
-	return resp.Table(&customers).AutoPaginated(db, &Customer{}, &req.PageInfoReq).Build()
+	return resp.Table(&customers).AutoPaginated(db, &Customer{}, &req.SearchFilterPageReq).Build()
 }
 
 // CustomerListOption 注册API

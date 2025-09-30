@@ -143,14 +143,14 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     db := ctx.MustGetOrInitDB()
 
     if req.IsByFiledValues() {
-        // 多值查询：使用 IN 查询
-        db.Where("id in ?", req.GetFiledValues())
+        // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+        db = db.Where("id in ?", req.GetFiledValues())
     } else if req.IsByFiledValue() {
         // 单值查询：使用等值查询，性能最优
-        db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
     } else {
         // 模糊查询：关键字搜索
-        db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+        db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
             Where("status = ?", "上架").
             Limit(20)
     }
@@ -195,14 +195,14 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     db := ctx.MustGetOrInitDB()
 
     if req.IsByFiledValues() {
-        // 多值查询：使用 IN 查询
-        db.Where("id in ?", req.GetFiledValues())
+        // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+        db = db.Where("id in ?", req.GetFiledValues())
     } else if req.IsByFiledValue() {
         // 单值查询：使用等值查询，性能最优
-        db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
     } else {
         // 模糊查询：关键字搜索
-        db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+        db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
             Where("status = ?", "上架").
             Where("stock > ?", 0).
             Limit(20)
@@ -265,12 +265,12 @@ Statistics: map[string]interface{}{
 ```go
 // ❌ 错误：单选字段用IN查询
 if req.IsByFiledValues() {
-    db.Where("id in ?", req.GetFiledValues()) // 单选字段用IN效率低
+    db = db.Where("id in ?", req.GetFiledValues()) // 单选字段用IN效率低
 }
 
 // ✅ 正确：单选字段用等值查询
 if req.IsByFiledValue() {
-    db.Where("id = ?", req.GetFiledValue()).Limit(1) // 性能最优
+    db = db.Where("id = ?", req.GetFiledValue()).Limit(1) // 性能最优
 }
 ```
 
@@ -346,5 +346,5 @@ db.Find(&items) // 这里会应用所有条件
 
 ## 📚 相关文档
 
-- [OnInputFuzzy聚合计算的常见用法和规范](./OnInputFuzzy聚合计算的常见用法和规范.mdc)
-- [SFT数据构造规范-最佳实践](./SFT数据构造规范-最佳实践.mdc)
+- [OnInputFuzzy聚合计算的常见用法和规范](OnInputFuzzy聚合计算的常见用法和规范.mdc)
+- [SFT数据构造规范-最佳实践](SFT数据构造规范-最佳实践.mdc)

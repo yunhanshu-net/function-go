@@ -11,7 +11,7 @@ import (
 
 type Table interface {
 	Builder
-	AutoPaginated(dbAndWhere *gorm.DB, model interface{}, pageInfo *query.PageInfoReq) Table
+	AutoPaginated(dbAndWhere *gorm.DB, model interface{}, pageInfo *query.SearchFilterPageReq) Table
 }
 
 type column struct {
@@ -91,10 +91,10 @@ func (t *tableData) Build() error {
 	return build(t.resp, t.Data, RenderTypeTable)
 }
 
-func (t *tableData) AutoPaginated(db *gorm.DB, model interface{}, pageInfo *query.PageInfoReq) Table {
+func (t *tableData) AutoPaginated(db *gorm.DB, model interface{}, pageInfo *query.SearchFilterPageReq) Table {
 
 	if pageInfo == nil {
-		pageInfo = new(query.PageInfoReq)
+		pageInfo = new(query.SearchFilterPageReq)
 	}
 
 	// 修复：在应用搜索条件之前先克隆数据库连接，避免污染原始连接

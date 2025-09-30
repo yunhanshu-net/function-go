@@ -35,14 +35,14 @@ func (p *Product) TableName() string {
 
 // ProductListReq 请求结构体
 type ProductListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // ProductList 产品列表处理逻辑
 func ProductList(ctx *runner.Context, req *ProductListReq, resp response.Response) error {
 	db := ctx.MustGetOrInitDB()
 	var products []Product
-	return resp.Table(&products).AutoPaginated(db, &Product{}, &req.PageInfoReq).Build()
+	return resp.Table(&products).AutoPaginated(db, &Product{}, &req.SearchFilterPageReq).Build()
 }
 
 // ProductListOption 注册API

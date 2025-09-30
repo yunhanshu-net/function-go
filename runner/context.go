@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/yunhanshu-net/function-go/env"
@@ -96,6 +97,53 @@ type Context struct {
 	runner *Runner
 }
 
+type FunctionUrl struct {
+	Title        string
+	Target       string
+	RouterGroup  string
+	FunctionName string
+	Query        string
+
+	FullPath string
+}
+
+// 生成一个可以跳转到指定函数的链接，一般是跳转到当前函数，
+func (c *Context) GetFunctionUrl(option *FunctionUrl) string {
+
+	//例如：/workspace/function/beiluo/test1/devops/devops_script_execute?xxx=nnn
+	if option.FullPath != "" { // 这样一般是前端已经存在的某个函数，用户要求需要提供跳转到某个函数的功能，这里一般用户需要提供完整的url，我们来实现跳转，这个可以跨项目，跨模块
+		split := strings.Split(option.FullPath, "/workspace/function/")
+		if len(split) != 2 {
+			return fmt.Sprintf("[%s]/%s", option.Title, strings.TrimLeft(split[0], "/"))
+		} else {
+			return fmt.Sprintf("[%s]/%s", option.Title, strings.TrimLeft(split[1], "/"))
+		}
+	}
+
+	///demo8/business/cdn/cdn_file_share_list
+	if len(option.Query) == 0 { // 这种一般只能在当前项目跳转
+		return fmt.Sprintf("[%s]/%s/%s/%s/%s", option.Title,
+			strings.Trim(c.user, "/"),
+			strings.Trim(c.name, "/"),
+			strings.Trim(option.RouterGroup, "/"),
+			strings.Trim(option.FunctionName, "/"))
+
+	}
+	return fmt.Sprintf("[%s]/%s/%s/%s/%s?%s", option.Title,
+		strings.Trim(c.user, "/"),
+		strings.Trim(c.name, "/"),
+		strings.Trim(option.RouterGroup, "/"),
+		strings.Trim(option.FunctionName, "/"), option.Query)
+}
+
+func (c *Context) Now() time.Time {
+	return time.Now()
+}
+
+func (c *Context) Since(time2 time.Time) time.Duration {
+	return time.Since(time2)
+}
+
 func NewContext(ctx context.Context, method string, router string, runner *Runner) *Context {
 	// 获取trace_id
 	traceID := ""
@@ -173,7 +221,7 @@ func (c *Context) GetUserInfo() UserInfo {
 
 	return UserInfo{
 		IsLoggedIn: true,
-		Username:   c.user,
+		Username:   "admin",
 	}
 }
 
@@ -311,6 +359,11 @@ func (fs *ContextFS) TempBaseDir() (string, error)            { return fs.ctx.Te
 func (fs *ContextFS) TempDir(parts ...string) (string, error) { return fs.ctx.TempDir(parts...) }
 func (fs *ContextFS) TempUniqueDir(prefix string, parts ...string) (string, error) {
 	return fs.ctx.TempUniqueDir(prefix, parts...)
+}
+
+func (fs *ContextFS) GetTempUniqueDir(part string) string {
+	//todo 这里应该是./temp/router把/替换成./trace_id/{part}
+	return ""
 }
 
 // Files 构建与上传（委托 Context 内部实现）

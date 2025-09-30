@@ -65,14 +65,14 @@ func (o *Order) TableName() string {
 
 // OrderListReq 请求结构体
 type OrderListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // OrderList 订单列表处理逻辑
 func OrderList(ctx *runner.Context, req *OrderListReq, resp response.Response) error {
 	db := ctx.MustGetOrInitDB()
 	var orders []Order
-	return resp.Table(&orders).AutoPaginated(db, &Order{}, &req.PageInfoReq).Build()
+	return resp.Table(&orders).AutoPaginated(db, &Order{}, &req.SearchFilterPageReq).Build()
 }
 
 // OrderListOption 注册API

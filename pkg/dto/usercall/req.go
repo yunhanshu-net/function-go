@@ -182,6 +182,10 @@ type OnInputValidateReq struct {
 	Request interface{} `json:"request"`
 }
 
+func (r *OnInputValidateReq) GetValueString() interface{} {
+	return fmt.Sprintf("%v", r.Value)
+}
+
 func (c *OnInputValidateReq) DecodeBy(el interface{}) error {
 	err := jsonx.Convert(c.Request, el)
 	if err != nil {
@@ -192,6 +196,10 @@ func (c *OnInputValidateReq) DecodeBy(el interface{}) error {
 
 type OnTableDeleteRowsReq struct {
 	Ids []int `json:"ids"`
+}
+
+func (c *OnTableDeleteRowsReq) GetIds() []int {
+	return c.Ids
 }
 
 type OnTableAddRowsReq struct {

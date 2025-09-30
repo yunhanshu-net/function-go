@@ -26,7 +26,7 @@ Q: 如何返回表单响应？
 A: return resp.Form(&MyResp{...}).Build()
 
 Q: 如何返回表格响应？
-A: return resp.Table(&rows).AutoPaginated(db, &Model{}, &req.PageInfoReq).Build()
+A: return resp.Table(&rows).AutoPaginated(db, &Model{}, &req.SearchFilterPageReq).Build()
 ```
 
 #### 1.2 结构体标签系统（100条）

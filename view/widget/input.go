@@ -26,7 +26,7 @@ func NewInputWidget(info *tagx.RunnerFieldInfo) (*InputWidget, error) {
 		return nil, fmt.Errorf("不是合法的值类型：%s", valueType)
 	}
 	if info == nil {
-		return nil, fmt.Errorf("<UNK>nil")
+		return nil, fmt.Errorf("nil")
 	}
 	if info.Tags == nil {
 		info.Tags = map[string]string{}

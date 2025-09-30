@@ -107,7 +107,7 @@ var tableOption = &TableFunctionOptions{
     OnPageLoad: func(ctx *Context, resp response.Response) (initData *usercall.OnPageLoadResp, err error) {
         return &usercall.OnPageLoadResp{
             Request: &ExampleListReq{
-                PageInfoReq: query.PageInfoReq{PageSize: 10},
+                PageInfoReq: query.SearchFilterPageReq{PageSize: 10},
             },
         }, nil
     },

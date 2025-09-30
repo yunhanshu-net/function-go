@@ -66,7 +66,7 @@ func SchoolStudentList(ctx *runner.Context, req *SchoolStudentListReq, resp resp
     var rows []SchoolStudent
     
     // 【框架核心】AutoPaginated自动处理分页、搜索、排序，基于模型的search标签
-    return resp.Table(&rows).AutoPaginated(db, &SchoolStudent{}, &req.PageInfoReq).Build()
+    return resp.Table(&rows).AutoPaginated(db, &SchoolStudent{}, &req.SearchFilterPageReq).Build()
 }
 
 // 【业务功能】创建学生档案，验证数据后插入数据库
@@ -102,16 +102,24 @@ func SchoolStudentCreate(ctx *runner.Context, req *SchoolStudentCreateReq, resp 
 // 【框架功能】OnInputFuzzy实现动态搜索和聚合统计
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     "student_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-        // 【业务逻辑】根据用户输入的关键词搜索学生
-        keyword := fmt.Sprintf("%v", req.Value)
+        // 【当前场景】student_id是单选字段，只返回静态信息，不做聚合计算
+        // 【目标字段】为 SchoolCourseSelectReq.StudentID 提供学生选择数据
         var students []SchoolStudent
-        
         db := ctx.MustGetOrInitDB()
-        // 【查询逻辑】按姓名和班级模糊搜索，只查询在校生，限制结果数量
-        db.Where("name LIKE ? OR class_name LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
-            Where("status = ?", "在校生").
-            Limit(20).
-            Find(&students)
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db = db.Where("name LIKE ? OR student_number LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "在校").
+                Limit(20)
+        }
+        db.Find(&students)
         
         // 【数据转换】构建前端显示的选项列表
         items := make([]*usercall.InputFuzzyItem, 0)
@@ -331,4 +339,4 @@ func GenerateCodeWithRAG(prompt string) string {
 
 **核心理念**：高质量SFT数据 = 高质量代码生成。精准训练，避免信息过载。
 
-**完整示例请参考**：[SFT数据构造规范-最佳实践.mdc](./SFT数据构造规范-最佳实践.mdc)
+**完整示例请参考**：[SFT数据构造规范-最佳实践.mdc](SFT数据构造规范-最佳实践.mdc)

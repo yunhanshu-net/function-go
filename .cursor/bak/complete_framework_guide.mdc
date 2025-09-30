@@ -155,14 +155,14 @@ func (LibraryBook) TableName() string { return "library_book" }
 
 // 请求结构体
 type LibraryBookListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // 查询处理函数
 func LibraryBookList(ctx *runner.Context, req *LibraryBookListReq, resp response.Response) error {
 	db := ctx.MustGetOrInitDB()
 	var rows []LibraryBook
-	return resp.Table(&rows).AutoPaginated(db, &LibraryBook{}, &req.PageInfoReq).Build()
+	return resp.Table(&rows).AutoPaginated(db, &LibraryBook{}, &req.SearchFilterPageReq).Build()
 }
 
 // API配置 - 统一使用回调，体现一等公民地位
@@ -528,12 +528,22 @@ Rating float64 `widget:"type:slider;min:1;max:5;step:0.5;unit:分"`
 ```go
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     "product_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-        keyword := fmt.Sprintf("%v", req.Value)
-        
-        // 查询匹配的产品
+        // 【当前场景】product_id是单选字段，只返回静态信息，不做聚合计算
+        // 【目标字段】为 ProductSelectReq.ProductID 提供商品选择数据
         var products []Product
         db := ctx.MustGetOrInitDB()
-        db.Where("name LIKE ?", "%"+keyword+"%").Find(&products)
+        
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db = db.Where("name LIKE ?", "%"+req.Keyword()+"%").Limit(20)
+        }
+        db.Find(&products)
         
         // 构建选项列表
         items := make([]*usercall.InputFuzzyItem, 0)
@@ -991,12 +1001,12 @@ type CrmMeetingRoomBooking struct {
 func (CrmMeetingRoomBooking) TableName() string { return "crm_meeting_room_booking" }
 
 // 会议室信息管理
-type CrmMeetingRoomInfoListReq struct { query.PageInfoReq `runner:"-"` }
+type CrmMeetingRoomInfoListReq struct { query.SearchFilterPageReq `runner:"-"` }
 
 func CrmMeetingRoomInfoList(ctx *runner.Context, req *CrmMeetingRoomInfoListReq, resp response.Response) error {
     db := ctx.MustGetOrInitDB()
     var rows []CrmMeetingRoomInfo
-    return resp.Table(&rows).AutoPaginated(db, &CrmMeetingRoomInfo{}, &req.PageInfoReq).Build()
+    return resp.Table(&rows).AutoPaginated(db, &CrmMeetingRoomInfo{}, &req.SearchFilterPageReq).Build()
 }
 
 var CrmMeetingRoomInfoListOption = &runner.TableFunctionOptions{
@@ -1013,14 +1023,14 @@ var CrmMeetingRoomInfoListOption = &runner.TableFunctionOptions{
 }
 
 // 会议室预约管理
-type CrmMeetingRoomBookingListReq struct { query.PageInfoReq `runner:"-"` }
+type CrmMeetingRoomBookingListReq struct { query.SearchFilterPageReq `runner:"-"` }
 
 func CrmMeetingRoomBookingList(ctx *runner.Context, req *CrmMeetingRoomBookingListReq, resp response.Response) error {
     db := ctx.MustGetOrInitDB()
     var rows []CrmMeetingRoomBooking
     
     // 获取分页数据
-    td := resp.Table(&rows).AutoPaginated(db, &CrmMeetingRoomBooking{}, &req.PageInfoReq)
+    td := resp.Table(&rows).AutoPaginated(db, &CrmMeetingRoomBooking{}, &req.SearchFilterPageReq)
     
     // 填充计算字段
     if len(rows) > 0 {
@@ -1075,14 +1085,24 @@ var CrmMeetingRoomBookingListOption = &runner.TableFunctionOptions{
     // 模糊搜索回调
     OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
         "room_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-            keyword := fmt.Sprintf("%v", req.Value)
+            // 【当前场景】room_id是单选字段，只返回静态信息，不做聚合计算
+            // 【目标字段】为 CrmMeetingRoomReserveReq.RoomID 提供会议室选择数据
             var rooms []CrmMeetingRoomInfo
-            
             db := ctx.MustGetOrInitDB()
-            db.Where("name LIKE ? OR type LIKE ? OR location LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%").
-                Where("status = ?", "可用").
-                Limit(20).
-                Find(&rooms)
+
+            if req.IsByFiledValues() {
+                // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+                db = db.Where("id in ?", req.GetFiledValues())
+            } else if req.IsByFiledValue() {
+                // 单值查询：使用等值查询，性能最优
+                db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            } else {
+                // 模糊查询：关键字搜索
+                db = db.Where("name LIKE ? OR location LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                    Where("status = ?", "可用").
+                    Limit(20)
+            }
+            db.Find(&rooms)
                 
             items := make([]*usercall.InputFuzzyItem, 0)
             for _, room := range rooms {

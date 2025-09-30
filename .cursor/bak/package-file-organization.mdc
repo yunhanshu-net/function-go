@@ -79,10 +79,10 @@ var IntelTicketGroup = &runner.FunctionGroup{CnName: "工单系统", EnName: "in
 type IntelTicket struct { /* ... */ }
 func (IntelTicket) TableName() string { return "intel_ticket" }
 
-type IntelTicketListReq struct { query.PageInfoReq `runner:"-"` }
+type IntelTicketListReq struct { query.SearchFilterPageReq `runner:"-"` }
 func IntelTicketList(ctx *runner.Context, req *IntelTicketListReq, resp response.Response) error {
   db := ctx.MustGetOrInitDB(); var rows []IntelTicket
-  return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.PageInfoReq).Build()
+  return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.SearchFilterPageReq).Build()
 }
 
 var IntelTicketListOption = &runner.TableFunctionOptions{ /* EnglishName: "intel_ticket_list", AutoCrudTable: &IntelTicket{} */ }

@@ -43,7 +43,7 @@ func (IntelTicket) TableName() string {
 }
 
 type IntelTicketListReq struct {
-    query.PageInfoReq `runner:"-"`
+    query.SearchFilterPageReq `runner:"-"`
 }
 
 type IntelTicketCreateReq struct {
@@ -58,7 +58,7 @@ type IntelTicketCreateResp struct {
 func IntelTicketList(ctx *runner.Context, req *IntelTicketListReq, resp response.Response) error {
     db := ctx.MustGetOrInitDB()
     var rows []IntelTicket
-    return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.PageInfoReq).Build()
+    return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.SearchFilterPageReq).Build()
 }
 
 func IntelTicketCreate(ctx *runner.Context, req *IntelTicketCreateReq, resp response.Response) error {
@@ -151,4 +151,3 @@ func IntelTicketAddService(ctx *runner.Context, rows []*IntelTicket) error { /* 
 避免用法：
 - BAD：`AddService`、`Create`、`Handle`（无前缀，易冲突）
 - GOOD：`IntelTicketAddService`、`IntelTicketCreate`（统一前缀+语义化后缀）
-

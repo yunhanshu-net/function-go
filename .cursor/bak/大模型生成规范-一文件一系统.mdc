@@ -82,12 +82,12 @@ type IntelTicket struct {
 func (IntelTicket) TableName() string { return "intel_ticket" }
 
 // Table：分页列表（AutoCrud）
-type IntelTicketListReq struct { query.PageInfoReq `runner:"-"` }
+type IntelTicketListReq struct { query.SearchFilterPageReq `runner:"-"` }
 
 func IntelTicketList(ctx *runner.Context, req *IntelTicketListReq, resp response.Response) error {
     db := ctx.MustGetOrInitDB()
     var rows []IntelTicket
-    return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.PageInfoReq).Build()
+    return resp.Table(&rows).AutoPaginated(db, &IntelTicket{}, &req.SearchFilterPageReq).Build()
 }
 
 var IntelTicketListOption = &runner.TableFunctionOptions{
@@ -179,4 +179,3 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
 - [ ] 默认值变量 `$` 前缀（如 `$now/$1`）
 
 只要遵守以上规则，大模型即可稳定产出可运行、可复用、可分发的单文件系统。
-

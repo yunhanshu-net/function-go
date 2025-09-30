@@ -115,13 +115,13 @@ func (SchoolStudent) TableName() string { return "school_student" }
 // ==================== 2. 业务逻辑 ====================
 
 type SchoolStudentListReq struct {
-    query.PageInfoReq `runner:"-"`
+    query.SearchFilterPageReq `runner:"-"`
 }
 
 func SchoolStudentList(ctx *runner.Context, req *SchoolStudentListReq, resp response.Response) error {
     db := ctx.MustGetOrInitDB()
     var rows []SchoolStudent
-    return resp.Table(&rows).AutoPaginated(db, &SchoolStudent{}, &req.PageInfoReq).Build()
+    return resp.Table(&rows).AutoPaginated(db, &SchoolStudent{}, &req.SearchFilterPageReq).Build()
 }
 
 type SchoolStudentCreateReq struct {
@@ -409,15 +409,24 @@ var SchoolCourseSelectOption = &runner.FormFunctionOptions{
     
     OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
         "student_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-            keyword := fmt.Sprintf("%v", req.Value)
-            db := ctx.MustGetOrInitDB()
-            
+            // 【当前场景】student_id是单选字段，只返回静态信息，不做聚合计算
+            // 【目标字段】为 SchoolCourseSelectReq.StudentID 提供学生选择数据
             var students []SchoolStudent
-            query := db.Where("status = ?", "在校生")
-            if keyword != "" {
-                query = query.Where("name LIKE ?", "%"+keyword+"%")
+            db := ctx.MustGetOrInitDB()
+
+            if req.IsByFiledValues() {
+                // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+                db = db.Where("id in ?", req.GetFiledValues())
+            } else if req.IsByFiledValue() {
+                // 单值查询：使用等值查询，性能最优
+                db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            } else {
+                // 模糊查询：关键字搜索
+                db = db.Where("name LIKE ? OR student_number LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                    Where("status = ?", "在校").
+                    Limit(20)
             }
-            query.Limit(20).Find(&students)
+            db.Find(&students)
             
             items := make([]*usercall.InputFuzzyItem, 0)
             for _, s := range students {

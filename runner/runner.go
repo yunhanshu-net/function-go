@@ -105,7 +105,7 @@ func (r *Runner) call(ctx context.Context, msg *nats.Msg) ([]byte, error) {
 	runResponse, err1 := r.runFunction(ctx, &req)
 	if err1 != nil {
 		logger.Errorf(ctx, "call runRequest err,req:%+v err:%s", req, err1.Error())
-		return nil, fmt.Errorf("call runRequest err,req:%+v err:%s", req, err1.Error())
+		return nil, err1
 	}
 	marshal, err1 := json.Marshal(runResponse)
 	if err1 != nil {

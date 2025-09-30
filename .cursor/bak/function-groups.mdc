@@ -20,7 +20,6 @@ var MyFunctionGroup = &runner.FunctionGroup{
 // 在函数配置中使用函数组
 var MyFunctionOption = &runner.FormFunctionOptions{
     BaseConfig: runner.BaseConfig{
-        EnglishName:  "my_function",
         ChineseName:  "我的函数",
         ApiDesc:      "函数描述",
         Tags:         []string{"标签1", "标签2"},
@@ -45,7 +44,6 @@ var IntelTicketsGroup = &runner.FunctionGroup{
 // 2. 工单列表查询函数（Table函数）
 var IntelTicketsListOption = &runner.TableFunctionOptions{
     BaseConfig: runner.BaseConfig{
-        EnglishName:  "intel_tickets_list",
         ChineseName:  "我的工单列表",
         ApiDesc:      "查询当前用户的工单列表，支持分页和搜索。",
         Tags:         []string{"工单管理", "列表查询", "用户工单"},
@@ -61,7 +59,6 @@ var IntelTicketsListOption = &runner.TableFunctionOptions{
 // 3. 工单提交函数（Form函数）
 var IntelTicketsCreateOption = &runner.FormFunctionOptions{
     BaseConfig: runner.BaseConfig{
-        EnglishName:  "intel_tickets_create",
         ChineseName:  "工单提交",
         ApiDesc:      "用户提交工单，系统自动计算预计处理时间。",
         Tags:         []string{"工单管理", "用户提交"},

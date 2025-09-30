@@ -34,14 +34,14 @@ func (e *Employee) TableName() string {
 
 // EmployeeListReq 请求结构体
 type EmployeeListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // EmployeeList 员工列表处理逻辑
 func EmployeeList(ctx *runner.Context, req *EmployeeListReq, resp response.Response) error {
 	db := ctx.MustGetOrInitDB()
 	var employees []Employee
-	return resp.Table(&employees).AutoPaginated(db, &Employee{}, &req.PageInfoReq).Build()
+	return resp.Table(&employees).AutoPaginated(db, &Employee{}, &req.SearchFilterPageReq).Build()
 }
 
 // EmployeeListOption 注册API

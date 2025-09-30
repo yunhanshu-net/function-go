@@ -12,6 +12,10 @@ type OnTableUpdateRowsReq struct {
 	Fields map[string]interface{} `json:"fields"` // 要更新的字段和值的映射
 }
 
+func (req *OnTableUpdateRowsReq) GetIds() []int {
+	return req.Ids
+}
+
 func (req *OnTableUpdateRowsReq) GetFieldsMap() map[string]interface{} {
 	return req.Fields
 }

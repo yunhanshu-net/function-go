@@ -25,14 +25,14 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
         db := ctx.MustGetOrInitDB()
 
         if req.IsByFiledValues() {
-            // 多值查询：使用 IN 查询
-            db.Where("id in ?", req.GetFiledValues())
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
         } else if req.IsByFiledValue() {
             // 单值查询：使用等值查询，性能最优
-            db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
         } else {
             // 模糊查询：关键字搜索
-            db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+            db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
                 Where("status = ?", "正常").
                 Limit(20)
         }
@@ -276,13 +276,13 @@ var SimpleCashierDeskOption = &runner.FormFunctionOptions{
 
             if req.IsByFiledValues() {
                 // 多值查询：使用 IN 查询
-                db.Where("id in ?", req.GetFiledValues())
+                db = db.Where("id in ?", req.GetFiledValues())
             } else if req.IsByFiledValue() {
                 // 单值查询：使用等值查询，性能最优
-                db.Where("id = ?", req.GetFiledValue()).Limit(1)
+                db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
             } else {
                 // 模糊查询：关键字搜索
-                db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
                     Where("status = ?", "上架").
                     Where("stock > ?", 0).
                     Limit(20)
@@ -327,13 +327,13 @@ var SimpleCashierDeskOption = &runner.FormFunctionOptions{
 
             if req.IsByFiledValues() {
                 // 多值查询：使用 IN 查询
-                db.Where("id in ?", req.GetFiledValues())
+                db = db.Where("id in ?", req.GetFiledValues())
             } else if req.IsByFiledValue() {
                 // 单值查询：使用等值查询，性能最优
-                db.Where("id = ?", req.GetFiledValue()).Limit(1)
+                db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
             } else {
                 // 模糊查询：关键字搜索
-                db.Where("card_number LIKE ? OR phone LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                db = db.Where("card_number LIKE ? OR phone LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
                     Where("status = ?", "正常").
                     Limit(10)
             }
@@ -398,13 +398,13 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
 
         if req.IsByFiledValues() {
             // 多值查询：使用 IN 查询
-            db.Where("id in ?", req.GetFiledValues())
+            db = db.Where("id in ?", req.GetFiledValues())
         } else if req.IsByFiledValue() {
             // 单值查询：使用等值查询，性能最优
-            db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
         } else {
             // 模糊查询：关键字搜索
-            db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+            db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
                 Where("status = ?", "上架").
                 Limit(20)
         }
@@ -460,13 +460,13 @@ OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
 
         if req.IsByFiledValues() {
             // 多值查询：使用 IN 查询
-            db.Where("id in ?", req.GetFiledValues())
+            db = db.Where("id in ?", req.GetFiledValues())
         } else if req.IsByFiledValue() {
             // 单值查询：使用等值查询，性能最优
-            db.Where("id = ?", req.GetFiledValue()).Limit(1)
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
         } else {
             // 模糊查询：关键字搜索
-            db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+            db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
                 Where("status = ?", "上架").
                 Limit(20)
         }
@@ -663,14 +663,44 @@ type ConditionalDisplayReq struct {
 
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     "product_search": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-        keyword := fmt.Sprintf("%v", req.Value)
-        
+        // 【当前场景】product_search是单选字段，只返回静态信息，不做聚合计算
+        // 【目标字段】为 ProductSearchReq.ProductSearch 提供商品选择数据
+        var products []Product
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "上架").
+                Limit(20)
+        }
+        db.Find(&products)
+
+        items := make([]*usercall.InputFuzzyItem, 0)
+        for _, product := range products {
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: product.ID,
+                Label: fmt.Sprintf("%s - ¥%.2f", product.Name, product.Price),
+                DisplayInfo: map[string]interface{}{
+                    "商品名称": product.Name,
+                    "价格":   product.Price,
+                    "库存":   product.Stock,
+                },
+            })
+        }
+
         return &usercall.OnInputFuzzyResp{
             Statistics: map[string]interface{}{
-                // ✅ 基于搜索关键词的动态信息
-                "搜索关键词": keyword,
-                "匹配商品数": "根据关键词匹配到的商品数量",
-                "推荐分类": "根据搜索推荐的分类",
+                "搜索规则": "支持商品名称和编码模糊搜索",
+                "显示数量": "最多显示20条结果",
+            },
+            Values: items,
                 "热门程度": "该关键词的搜索热度",
                 
                 // ✅ 静态业务信息
@@ -770,14 +800,51 @@ type CorrectFieldAccessReq struct {
 
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     "product_ids": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-        keyword := fmt.Sprintf("%v", req.Value)
-        
+        // 【当前场景】product_ids是多选字段，支持聚合统计计算
+        // 【目标字段】为 MultiProductReq.ProductIDs 提供商品多选数据
+        var products []Product
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+        } else {
+            // 模糊查询：关键字搜索
+            db = db.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "上架").
+                Limit(20)
+        }
+        db.Find(&products)
+
+        items := make([]*usercall.InputFuzzyItem, 0)
+        for _, product := range products {
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: product.ID,
+                Label: fmt.Sprintf("%s - ¥%.2f", product.Name, product.Price),
+                DisplayInfo: map[string]interface{}{
+                    "商品名称": product.Name,
+                    "价格":   product.Price,
+                    "库存":   product.Stock,
+                },
+            })
+        }
+
         return &usercall.OnInputFuzzyResp{
             Statistics: map[string]interface{}{
-                "批发优惠": "满100件8折",  // 静态业务规则
-                "零售优惠": "满99元包邮", // 静态业务规则
-                "搜索关键词": keyword,   // 可以显示搜索关键词
+                // ✅ 多选聚合计算
+                "选中商品数": "count(价格)",
+                "选中商品总价": "sum(价格,*quantity)",
+                "最低单价": "min(价格)",
+                "最高单价": "max(价格)",
+                
+                // ✅ 静态信息
+                "批发优惠": "满10件8折",
+                "配送说明": "全国包邮",
             },
+            Values: items,
         }, nil
     },
 }

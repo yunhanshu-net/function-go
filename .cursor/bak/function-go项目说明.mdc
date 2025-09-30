@@ -91,8 +91,10 @@ err := db.Where("age > ?", 18).Find(&users).Error
 
 #### 示例代码
 
+
 ```go
-package demo
+//文件名： reverse.go
+package reverse
 
 import (
     "github.com/yunhanshu-net/function-go/pkg/dto/response"
@@ -130,7 +132,6 @@ func reverseString(s string) string {
 // 4. 注册API
 var ReverseOption = &runner.FormFunctionOptions{
     BaseConfig: runner.BaseConfig{
-        EnglishName:  "reverse_demo",
         ChineseName:  "字符串反转演示",
         ApiDesc:      "输入内容，返回其反转结果。内容不能为空。",
         Tags:         []string{"input", "字符串", "表单演示"},
@@ -140,7 +141,7 @@ var ReverseOption = &runner.FormFunctionOptions{
 }
 
 func init() {
-	runner.Post("/demo/reverse", ReverseHandler, ReverseOption)
+	runner.Post(RouterGroup+"/reverse", ReverseHandler, ReverseOption)
 }
 ```
 
@@ -172,7 +173,7 @@ func init() {
 #### 示例代码
 
 ```go
-package widgets
+package book
 
 import (
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
@@ -200,7 +201,7 @@ func (b *Book) TableName() string {
 
 // BookListReq 2. 请求结构体（自动包含分页和搜索）
 type BookListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // BookList 3. table函数处理逻辑
@@ -208,13 +209,12 @@ func BookList(ctx *runner.Context, req *BookListReq, resp response.Response) err
 	db := ctx.MustGetOrInitDB() // gorm db
 	var books []Book
 	// 自动分页和搜索
-	return resp.Table(&books).AutoPaginated(db, &Book{}, &req.PageInfoReq).Build()
+	return resp.Table(&books).AutoPaginated(db, &Book{}, &req.SearchFilterPageReq).Build()
 }
 
 // BookListOption 4. 注册API
 var BookListOption = &runner.TableFunctionOptions{
 	BaseConfig: runner.BaseConfig{
-		EnglishName:  "book_list",
 		ChineseName:  "图书列表",
 		ApiDesc:      "展示图书列表，支持分页和搜索。",
 		Tags:         []string{"图书管理", "表格演示"},
@@ -226,7 +226,7 @@ var BookListOption = &runner.TableFunctionOptions{
 }
 
 func init() {
-	runner.Get("/demo/book_list", BookList, BookListOption)
+	runner.Get(RouterGroup+"/book_list", BookList, BookListOption)
 }
 ```
 
@@ -241,7 +241,7 @@ func init() {
 #### 规范说明
 - 基础字段：建议所有业务表都包含ID、创建时间、软删除等通用字段。
 - search标签：如 `search:"like"`、`search:"in"` 等，前端会自动生成对应的搜索输入框或下拉筛选。
-- 分页请求：`query.PageInfoReq runner:"-"` 是table函数的固定写法，自动支持分页、排序、搜索等功能。
+- 分页请求：`query.SearchFilterPageReq runner:"-"` 是table函数的固定写法，自动支持分页、排序、搜索等功能。
 - 表名方法：`TableName` 必须实现，否则自动建表和查询会失败。
 - 响应构建：`resp.Table(...)` 返回结果，自动渲染为表格。
 - 配置类型：table函数使用 `runner.TableFunctionOptions`，form函数使用 `runner.FormFunctionOptions`。
@@ -301,19 +301,18 @@ func (CrmTicket) TableName() string { return "crm_ticket" }
 
 // 标准table函数请求参数：包含分页、搜索、排序功能
 type CrmTicketListReq struct {
-    query.PageInfoReq `runner:"-"` // 分页请求：框架自动生成分页、搜索、排序功能
+    query.SearchFilterPageReq `runner:"-"` // 分页请求：框架自动生成分页、搜索、排序功能
 }
 
 // 标准table函数：自动处理分页查询，返回表格数据
 func CrmTicketList(ctx *runner.Context, req *CrmTicketListReq, resp response.Response) error {
     db := ctx.MustGetOrInitDB()
     var rows []CrmTicket
-    return resp.Table(&rows).AutoPaginated(db, &CrmTicket{}, &req.PageInfoReq).Build()
+    return resp.Table(&rows).AutoPaginated(db, &CrmTicket{}, &req.SearchFilterPageReq).Build()
 }
 
 var CrmTicketListOption = &runner.TableFunctionOptions{
     BaseConfig: runner.BaseConfig{
-        EnglishName:  "crm_ticket_list",
         ChineseName:  "CRM工单管理-列表",
         ApiDesc:      "CRM工单基础信息管理，支持工单创建、查询、状态管理和附件上传。",
         Tags:         []string{"CRM", "工单管理", "客户服务"},
@@ -440,7 +439,7 @@ var PdfEncryptOption = &runner.FormFunctionOptions{
 }
 
 func init() {
-    runner.Post("/pdf/pdf_encrypt", PdfEncryptHandle, PdfEncryptOption)
+    runner.Post(RouterGroup+"/pdf_encrypt", PdfEncryptHandle, PdfEncryptOption)
 }
 ```
 
@@ -553,38 +552,86 @@ OnPageLoad: func(ctx *runner.Context, resp response.Response) (initData *usercal
 ```go
 OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
     "company_search": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-        // 公司名称模糊搜索
-        db := ctx.MustGetOrInitDB()
+        // 【当前场景】company_search是单选字段，只返回静态信息，不做聚合计算
+        // 【目标字段】为 CallbackDemoReq.CompanySearch 提供公司选择数据
         var companies []Company
-        if req.Value != "" {
-            db.Where("name LIKE ? OR industry LIKE ?", "%"+req.Value+"%", "%"+req.Value+"%").Limit(10).Find(&companies)
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
         } else {
-            db.Limit(10).Find(&companies)
+            // 模糊查询：关键字搜索
+            db = db.Where("name LIKE ? OR industry LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "正常").
+                Limit(10)
         }
-        resp := &usercall.OnInputFuzzyResp{}
+        db.Find(&companies)
+
+        items := make([]*usercall.InputFuzzyItem, 0)
         for _, company := range companies {
-            resp.Values = append(resp.Values, &usercall.InputFuzzyItem{
-                Value: company.Name, // 只需赋值 Value 字段
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: company.Name,
+                Label: fmt.Sprintf("%s - %s", company.Name, company.Industry),
+                DisplayInfo: map[string]interface{}{
+                    "公司名称": company.Name,
+                    "行业":   company.Industry,
+                    "地址":   company.Address,
+                },
             })
         }
-        return resp, nil
+
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "搜索规则": "支持公司名称和行业模糊搜索",
+                "显示数量": "最多显示10条结果",
+            },
+            Values: items,
+        }, nil
     },
     "user_search": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
-        // 用户名称模糊搜索
-        db := ctx.MustGetOrInitDB()
+        // 【当前场景】user_search是单选字段，只返回静态信息，不做聚合计算
+        // 【目标字段】为 CallbackDemoReq.UserSearch 提供用户选择数据
         var users []UserProfile
-        if req.Value != "" {
-            db.Where("username LIKE ? OR email LIKE ? OR department LIKE ?", "%"+req.Value+"%", "%"+req.Value+"%", "%"+req.Value+"%").Limit(10).Find(&users)
+        db := ctx.MustGetOrInitDB()
+
+        if req.IsByFiledValues() {
+            // 多值查询：使用 IN 查询，这里必须用 db = db.Where
+            db = db.Where("id in ?", req.GetFiledValues())
+        } else if req.IsByFiledValue() {
+            // 单值查询：使用等值查询，性能最优
+            db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
         } else {
-            db.Limit(10).Find(&users)
+            // 模糊查询：关键字搜索
+            db = db.Where("username LIKE ? OR email LIKE ? OR department LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+                Where("status = ?", "正常").
+                Limit(10)
         }
-        resp := &usercall.OnInputFuzzyResp{}
+        db.Find(&users)
+
+        items := make([]*usercall.InputFuzzyItem, 0)
         for _, user := range users {
-            resp.Values = append(resp.Values, &usercall.InputFuzzyItem{
-                Value: user.Username, // 只需赋值 Value 字段
+            items = append(items, &usercall.InputFuzzyItem{
+                Value: user.Username,
+                Label: fmt.Sprintf("%s - %s (%s)", user.Username, user.Email, user.Department),
+                DisplayInfo: map[string]interface{}{
+                    "用户名": user.Username,
+                    "邮箱":  user.Email,
+                    "部门":  user.Department,
+                },
             })
         }
-        return resp, nil
+
+        return &usercall.OnInputFuzzyResp{
+            Statistics: map[string]interface{}{
+                "搜索规则": "支持用户名、邮箱和部门模糊搜索",
+                "显示数量": "最多显示10条结果",
+            },
+            Values: items,
+        }, nil
     },
 }
 ```

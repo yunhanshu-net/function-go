@@ -196,7 +196,7 @@ func (b *Book) TableName() string {
 
 // BookListReq 2. 请求结构体（自动包含分页和搜索）
 type BookListReq struct {
-	query.PageInfoReq `runner:"-"`
+	query.SearchFilterPageReq `runner:"-"`
 }
 
 // BookList 3. table函数处理逻辑
@@ -204,7 +204,7 @@ func BookList(ctx *runner.Context, req *BookListReq, resp response.Response) err
 	db := ctx.MustGetOrInitDB() // gorm db
 	var books []Book
 	// 自动分页和搜索
-	return resp.Table(&books).AutoPaginated(db, &Book{}, &req.PageInfoReq).Build()
+	return resp.Table(&books).AutoPaginated(db, &Book{}, &req.SearchFilterPageReq).Build()
 }
 
 // BookListOption 4. 注册API
@@ -236,7 +236,7 @@ func init() {
 #### 规范说明
 - BaseModel 建议所有业务表都嵌入，统一ID、创建时间、软删除等通用字段。
 - search 标签如 search:"like"、search:"eq" 等，前端会自动生成对应的搜索输入框或下拉筛选。
-- query.PageInfoReq runner:"-"：table函数的固定写法，自动支持分页、排序、搜索等功能。
+- query.SearchFilterPageReq runner:"-"：table函数的固定写法，自动支持分页、排序、搜索等功能。
 - TableName 必须实现，否则自动建表和查询会失败。
 - resp.Table(...) 返回结果，自动渲染为表格。
 - 注册API用 FunctionOptions，推荐写清楚 Request/Response/RenderType/CreateTables/AutoCrudTable。
