@@ -2565,7 +2565,6 @@ table函数最佳实践：招聘管理系统
 同时用户可以选择自己的标签：默认可选项（开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析）允许自定义多选值
 
 ```go
-
 // 文件名：hr_recruitment.go
 package hr
 
@@ -2588,43 +2587,143 @@ var HrRecruitmentGroup = &runner.FunctionGroup{
 
 // 简历数据模型
 type HrRecruitment struct {
-	// 系统字段
-	ID        int            `json:"id" gorm:"primaryKey;autoIncrement;column:id" runner:"name:简历ID" permission:"read"`
-	CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli;column:created_at" runner:"name:投递时间" widget:"type:datetime;kind:datetime" permission:"read"`
-	UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime:milli;column:updated_at" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	// 框架标签：runner:"name:简历ID" - 设置字段在前端的显示名称
+	// 框架标签：permission:"read" - 字段只读权限（不能编辑）
+	// 框架标签：search:"eq,gte,lte" - 启用精确搜索和范围搜索功能
+	// 注意：gorm:"column:id" 明确指定数据库列名，确保映射正确
+	ID int `json:"id" gorm:"primaryKey;autoIncrement;column:id" runner:"name:简历ID" permission:"read" search:"eq,gte,lte"`
+
+	// 框架标签：widget:"type:datetime;kind:datetime" - 日期时间选择器组件
+	// 框架标签：search:"gte,lte" - 启用时间范围搜索功能（大于等于、小于等于）
+	// 注意：gorm:"autoCreateTime:milli" 自动填充创建时间（毫秒级时间戳，必须是毫秒级别）
+	CreatedAt int64 `json:"created_at" gorm:"autoCreateTime:milli;column:created_at" runner:"name:投递时间" widget:"type:datetime;kind:datetime" permission:"read" search:"gte,lte"`
+
+	// 框架标签：widget:"type:datetime;kind:datetime" - 日期时间选择器组件
+	// 框架标签：search:"gte,lte" - 启用时间范围搜索功能（大于等于、小于等于）
+	// 注意：gorm:"autoUpdateTime:milli" 自动填充更新时间（毫秒级时间戳，必须是毫秒级别）
+	UpdatedAt int64 `json:"updated_at" gorm:"autoUpdateTime:milli;column:updated_at" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read" search:"gte,lte"`
+
+	// 框架标签：runner:"-" - 隐藏字段（不在前端显示）
 	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index;column:deleted_at" runner:"-"`
 
-	// 个人信息
-	Name      string `json:"name" gorm:"column:name" runner:"name:姓名" widget:"type:input" search:"like" validate:"required,min=2,max=20"`
-	Phone     string `json:"phone" gorm:"column:phone" runner:"name:手机号" widget:"type:input" search:"like" validate:"required,min=11,max=11"`
-	Email     string `json:"email" gorm:"column:email" runner:"name:邮箱" widget:"type:input" search:"like" validate:"required,email"`
-	Age       int    `json:"age" gorm:"column:age" runner:"name:年龄" widget:"type:number;min:18;max:65;unit:岁" search:"gte,lte" validate:"required,min=18,max=65"`
-	Gender    string `json:"gender" gorm:"column:gender" runner:"name:性别" widget:"type:select;options:男,女" search:"in" validate:"required,oneof=男 女"`
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required,min=2,max=20" - 必填字段，长度2-20字符
+	Name string `json:"name" gorm:"column:name" runner:"name:姓名" widget:"type:input" search:"like" validate:"required,min=2,max=20"`
+
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required,min=11,max=11" - 必填字段，长度必须为11位
+	Phone string `json:"phone" gorm:"column:phone" runner:"name:手机号" widget:"type:input" search:"like" validate:"required,min=11,max=11"`
+
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required,email" - 必填字段，必须是有效的邮箱格式
+	Email string `json:"email" gorm:"column:email" runner:"name:邮箱" widget:"type:input" search:"like" validate:"required,email"`
+
+	// 框架标签：widget:"type:number;min:18;max:65;unit:岁" - 数字输入组件，最小值18，最大值65，单位岁
+	// 框架标签：search:"gte,lte" - 启用范围搜索功能（大于等于、小于等于）
+	// 框架标签：validate:"required,min=18,max=65" - 必填字段，年龄范围18-65岁
+	Age int `json:"age" gorm:"column:age" runner:"name:年龄" widget:"type:number;min:18;max:65;unit:岁" search:"gte,lte" validate:"required,min=18,max=65"`
+
+	// 框架标签：widget:"type:select;options:男,女" - 下拉选择组件（选项：男/女）
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required,oneof=男 女" - 必填字段，值必须是选项之一
+	Gender string `json:"gender" gorm:"column:gender" runner:"name:性别" widget:"type:select;options:男,女" search:"in" validate:"required,oneof=男 女"`
+
+	// 框架标签：widget:"type:select;options:高中,大专,本科,硕士,博士" - 下拉选择组件
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required" - 必填字段
 	Education string `json:"education" gorm:"column:education" runner:"name:学历" widget:"type:select;options:高中,大专,本科,硕士,博士" search:"in" validate:"required"`
 
-	// 求职信息
-	Position   string `json:"position" gorm:"column:position" runner:"name:应聘职位" widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" search:"in" validate:"required"`
-	WorkCity   string `json:"work_city" gorm:"column:work_city" runner:"name:期望工作地" widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" search:"in" validate:"required"`
+	// 框架标签：widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" - 下拉选择组件
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required" - 必填字段
+	Position string `json:"position" gorm:"column:position" runner:"name:应聘职位" widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" search:"in" validate:"required"`
+
+	// 框架标签：widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" - 下拉选择组件
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required" - 必填字段
+	WorkCity string `json:"work_city" gorm:"column:work_city" runner:"name:期望工作地" widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" search:"in" validate:"required"`
+
+	// 框架标签：widget:"type:select;options:应届生,1年以下,1-3年,3-5年,5-10年,10年以上" - 下拉选择组件
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required" - 必填字段
 	Experience string `json:"experience" gorm:"column:experience" runner:"name:工作经验" widget:"type:select;options:应届生,1年以下,1-3年,3-5年,5-10年,10年以上" search:"in" validate:"required"`
-	Salary     string `json:"salary" gorm:"column:salary" runner:"name:期望薪资" widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" search:"in" validate:"required"`
 
-	// 简历信息
-	Resume    *files.Files `json:"resume" gorm:"type:json;column:resume" runner:"name:简历附件" widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" validate:"required"`
-	Introduce string       `json:"introduce" gorm:"column:introduce" runner:"name:自我介绍" widget:"type:input;mode:text_area" search:"like" validate:"required,min=20,max=500"`
+	// 条件字段：当工作经验=应届生时显示毕业时间字段
+	// 框架标签：widget:"type:number;min:2020;max:2030;unit:年" - 数字输入组件，最小值2020，最大值2030，单位年
+	// 框架标签：search:"gte,lte" - 启用范围搜索功能（大于等于、小于等于）
+	// 框架标签：validate:"required_if=experience 应届生,min=2020,max=2030" - 当工作经验=应届生时必填
+	GraduationYear int `json:"graduation_year" gorm:"column:graduation_year;comment:毕业年份" runner:"name:毕业年份" widget:"type:number;min:2020;max:2030;unit:年" search:"gte,lte" data:"default_value:2024;example:2024" validate:"required_if=experience 应届生,min=2020,max=2030"`
 
-	// 标签信息，
-	//multiselect有两种类型，一种string的会用,号分隔多个值
-	//第二种[]string，会直接用切片存储多个值
-	//为了方便存储到数据库我们选择用string
-	//allow_create 表示允许创建自定义标签
+	// 条件字段：当工作经验=应届生时显示实习经历
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required_if=experience 应届生" - 当工作经验=应届生时必填
+	InternshipExperience string `json:"internship_experience" gorm:"column:internship_experience;comment:实习经历" runner:"name:实习经历" widget:"type:input;mode:text_area" search:"like" data:"example:在XX公司实习3个月，负责前端开发" validate:"required_if=experience 应届生"`
+
+	// 条件字段：当工作经验≠应届生时显示项目经验
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required_unless=experience 应届生" - 当工作经验≠应届生时必填
+	ProjectExperience string `json:"project_experience" gorm:"column:project_experience;comment:项目经验" runner:"name:项目经验" widget:"type:input;mode:text_area" search:"like" data:"example:负责XX项目的架构设计和开发" validate:"required_unless=experience 应届生"`
+
+	// 框架标签：widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" - 下拉选择组件
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required" - 必填字段
+	Salary string `json:"salary" gorm:"column:salary" runner:"name:期望薪资" widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" search:"in" validate:"required"`
+
+	// 条件字段：当期望薪资=30K以上时显示具体薪资
+	// 框架标签：widget:"type:number;min:30000;max:100000;unit:元" - 数字输入组件，最小值30000，最大值100000，单位元
+	// 框架标签：search:"gte,lte" - 启用范围搜索功能（大于等于、小于等于）
+	// 框架标签：validate:"required_if=salary 30K以上,min=30000,max=100000" - 当期望薪资=30K以上时必填
+	SpecificSalary int `json:"specific_salary" gorm:"column:specific_salary;comment:具体期望薪资" runner:"name:具体期望薪资" widget:"type:number;min:30000;max:100000;unit:元" search:"gte,lte" data:"example:35000" validate:"required_if=salary 30K以上,min=30000,max=100000"`
+
+	// 框架标签：widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" - 文件上传组件
+	// 框架标签：accept:.pdf,.doc,.docx - 允许上传的文件类型
+	// 注意：gorm:"type:json" 指定数据库存储为JSON类型
+	// 框架标签：validate:"required" - 必填字段
+	//search:"-" 不允许搜索
+	Resume *files.Files `json:"resume" gorm:"type:json;column:resume" runner:"name:简历附件" widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" validate:"required" search:"-"`
+
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required,min=20,max=500" - 必填字段，长度20-500字符
+	Introduce string `json:"introduce" gorm:"column:introduce" runner:"name:自我介绍" widget:"type:input;mode:text_area" search:"like" validate:"required,min=20,max=500"`
+
+	// 框架标签：widget:"type:multiselect;options:开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析;allow_create:true" - 多选组件
+	// 框架标签：allow_create:true - 允许创建自定义标签
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 注意：multiselect有两种类型，一种string的会用,号分隔多个值，第二种[]string，会直接用切片存储多个值
+	// 为了方便存储到数据库我们选择用string
 	Tags string `json:"tags" gorm:"column:tags;comment:个人标签" runner:"name:个人标签" widget:"type:multiselect;options:开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析;allow_create:true" search:"like"`
 
-	// 状态信息
-	Status string `json:"status" gorm:"column:status" runner:"name:简历状态" widget:"type:select;options:待面试,已面试,已通过,已落选" data:"default_value:待面试" search:"in" validate:"required,oneof=待面试 已面试 已通过 已落选"`
-	Remark string `json:"remark" gorm:"column:remark" runner:"name:备注" widget:"type:input;mode:text_area"`
+	// 条件字段：当学历=硕士或博士时显示毕业院校
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required_if=education 博士" - 当学历=博士时必填
+	GraduateSchool string `json:"graduate_school" gorm:"column:graduate_school;comment:毕业院校" runner:"name:毕业院校" widget:"type:input" search:"like" data:"example:清华大学" validate:"required_if=education 博士"`
 
-	// 创建用户
-	CreateBy string `json:"create_by" gorm:"column:create_by" runner:"name:投递人" widget:"type:user"`
+	// 条件字段：当学历=博士时显示研究方向
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	// 框架标签：validate:"required_if=education 博士" - 当学历=博士时必填
+	ResearchField string `json:"research_field" gorm:"column:research_field;comment:研究方向" runner:"name:研究方向" widget:"type:input" search:"like" data:"example:人工智能" validate:"required_if=education 博士"`
+
+	// 框架标签：widget:"type:select;options:待面试,已面试,已通过,已落选" - 下拉选择组件
+	// 框架标签：data:"default_value:待面试" - 设置默认状态为"待面试"
+	// 框架标签：search:"in" - 启用精确匹配搜索功能
+	// 框架标签：validate:"required,oneof=待面试 已面试 已通过 已落选" - 值必须是有效状态
+	Status string `json:"status" gorm:"column:status" runner:"name:简历状态" widget:"type:select;options:待面试,已面试,已通过,已落选" data:"default_value:待面试" search:"in" validate:"required,oneof=待面试 已面试 已通过 已落选"`
+
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	Remark string `json:"remark" gorm:"column:remark" runner:"name:备注" widget:"type:input;mode:text_area" search:"like"`
+
+	// 框架标签：widget:"type:user" - 用户组件
+	// 框架标签：search:"like" - 启用模糊搜索功能
+	CreateBy string `json:"create_by" gorm:"column:create_by" runner:"name:投递人" widget:"type:user" search:"like"`
 }
 
 // 指定数据库表名
@@ -2632,47 +2731,123 @@ func (HrRecruitment) TableName() string { return "hr_recruitment" }
 
 // 简历投递请求结构
 type HrRecruitmentApplyReq struct {
-	// 个人信息
-	Name      string `json:"name" runner:"name:姓名" widget:"type:input" validate:"required,min=2,max=20"`
-	Phone     string `json:"phone" runner:"name:手机号" widget:"type:input" validate:"required,min=11,max=11"`
-	Email     string `json:"email" runner:"name:邮箱" widget:"type:input" validate:"required,email"`
-	Age       int    `json:"age" runner:"name:年龄" widget:"type:number;min:18;max:65;unit:岁" validate:"required,min=18,max=65"`
-	Gender    string `json:"gender" runner:"name:性别" widget:"type:select;options:男,女" validate:"required,oneof=男 女"`
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：validate:"required,min=2,max=20" - 必填字段，长度2-20字符
+	Name string `json:"name" runner:"name:姓名" widget:"type:input" validate:"required,min=2,max=20"`
+
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：validate:"required,min=11,max=11" - 必填字段，长度必须为11位
+	Phone string `json:"phone" runner:"name:手机号" widget:"type:input" validate:"required,min=11,max=11"`
+
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：validate:"required,email" - 必填字段，必须是有效的邮箱格式
+	Email string `json:"email" runner:"name:邮箱" widget:"type:input" validate:"required,email"`
+
+	// 框架标签：widget:"type:number;min:18;max:65;unit:岁" - 数字输入组件，最小值18，最大值65，单位岁
+	// 框架标签：validate:"required,min=18,max=65" - 必填字段，年龄范围18-65岁
+	Age int `json:"age" runner:"name:年龄" widget:"type:number;min:18;max:65;unit:岁" validate:"required,min=18,max=65"`
+
+	// 框架标签：widget:"type:select;options:男,女" - 下拉选择组件（选项：男/女）
+	// 框架标签：validate:"required,oneof=男 女" - 必填字段，值必须是选项之一
+	Gender string `json:"gender" runner:"name:性别" widget:"type:select;options:男,女" validate:"required,oneof=男 女"`
+
+	// 框架标签：widget:"type:select;options:高中,大专,本科,硕士,博士" - 下拉选择组件
+	// 框架标签：validate:"required" - 必填字段
 	Education string `json:"education" runner:"name:学历" widget:"type:select;options:高中,大专,本科,硕士,博士" validate:"required"`
 
-	// 求职信息
-	Position   string `json:"position" runner:"name:应聘职位" widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" validate:"required"`
-	WorkCity   string `json:"work_city" runner:"name:期望工作地" widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" validate:"required"`
+	// 条件字段：当学历=硕士或博士时显示毕业院校
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：validate:"required_if=education 博士" - 当学历=博士时必填
+	GraduateSchool string `json:"graduate_school" runner:"name:毕业院校" widget:"type:input" data:"example:清华大学" validate:"required_if=education 博士"`
+
+	// 条件字段：当学历=博士时显示研究方向
+	// 框架标签：widget:"type:input" - 文本输入框组件
+	// 框架标签：validate:"required_if=education 博士" - 当学历=博士时必填
+	ResearchField string `json:"research_field" runner:"name:研究方向" widget:"type:input" data:"example:人工智能" validate:"required_if=education 博士"`
+
+	// 框架标签：widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" - 下拉选择组件
+	// 框架标签：validate:"required" - 必填字段
+	Position string `json:"position" runner:"name:应聘职位" widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" validate:"required"`
+
+	// 框架标签：widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" - 下拉选择组件
+	// 框架标签：validate:"required" - 必填字段
+	WorkCity string `json:"work_city" runner:"name:期望工作地" widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" validate:"required"`
+
+	// 框架标签：widget:"type:select;options:应届生,1年以下,1-3年,3-5年,5-10年,10年以上" - 下拉选择组件
+	// 框架标签：validate:"required" - 必填字段
 	Experience string `json:"experience" runner:"name:工作经验" widget:"type:select;options:应届生,1年以下,1-3年,3-5年,5-10年,10年以上" validate:"required"`
-	Salary     string `json:"salary" runner:"name:期望薪资" widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" validate:"required"`
 
-	// 简历信息
-	Resume    *files.Files `json:"resume" runner:"name:简历附件" widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" validate:"required"`
-	Introduce string       `json:"introduce" runner:"name:自我介绍" widget:"type:input;mode:text_area" validate:"required,min=20,max=500"`
+	// 条件字段：当工作经验=应届生时显示毕业时间字段
+	// 框架标签：widget:"type:number;min:2020;max:2030;unit:年" - 数字输入组件，最小值2020，最大值2030，单位年
+	// 框架标签：validate:"required_if=experience 应届生,min=2020,max=2030" - 当工作经验=应届生时必填
+	GraduationYear int `json:"graduation_year" runner:"name:毕业年份" widget:"type:number;min:2020;max:2030;unit:年" data:"default_value:2024;example:2024" validate:"required_if=experience 应届生,min=2020,max=2030"`
 
-	// 标签信息，
-	//multiselect有两种类型，一种string的会用,号分隔多个值
-	//第二种[]string，会直接用切片存储多个值
-	//为了方便存储到数据库我们选择用string
-	//allow_create 表示允许创建自定义标签
+	// 条件字段：当工作经验=应届生时显示实习经历
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：validate:"required_if=experience 应届生" - 当工作经验=应届生时必填
+	InternshipExperience string `json:"internship_experience" runner:"name:实习经历" widget:"type:input;mode:text_area" data:"example:在XX公司实习3个月，负责前端开发" validate:"required_if=experience 应届生"`
+
+	// 条件字段：当工作经验≠应届生时显示项目经验
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：validate:"required_unless=experience 应届生" - 当工作经验≠应届生时必填
+	ProjectExperience string `json:"project_experience" runner:"name:项目经验" widget:"type:input;mode:text_area" data:"example:负责XX项目的架构设计和开发" validate:"required_unless=experience 应届生"`
+
+	// 框架标签：widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" - 下拉选择组件
+	// 框架标签：validate:"required" - 必填字段
+	Salary string `json:"salary" runner:"name:期望薪资" widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" validate:"required"`
+
+	// 条件字段：当期望薪资=30K以上时显示具体薪资
+	// 框架标签：widget:"type:number;min:30000;max:100000;unit:元" - 数字输入组件，最小值30000，最大值100000，单位元
+	// 框架标签：validate:"required_if=salary 30K以上,min=30000,max=100000" - 当期望薪资=30K以上时必填
+	SpecificSalary int `json:"specific_salary" runner:"name:具体期望薪资" widget:"type:number;min:30000;max:100000;unit:元" data:"example:35000" validate:"required_if=salary 30K以上,min=30000,max=100000"`
+
+	// 框架标签：widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" - 文件上传组件
+	// 框架标签：accept:.pdf,.doc,.docx - 允许上传的文件类型
+	// 框架标签：validate:"required" - 必填字段
+	Resume *files.Files `json:"resume" runner:"name:简历附件" widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" validate:"required"`
+
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
+	// 框架标签：validate:"required,min=20,max=500" - 必填字段，长度20-500字符
+	Introduce string `json:"introduce" runner:"name:自我介绍" widget:"type:input;mode:text_area" validate:"required,min=20,max=500"`
+
+	// 框架标签：widget:"type:multiselect;options:开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析;allow_create:true" - 多选组件
+	// 框架标签：allow_create:true - 允许创建自定义标签
+	// 注意：multiselect有两种类型，一种string的会用,号分隔多个值，第二种[]string，会直接用切片存储多个值
+	// 为了方便存储到数据库我们选择用string
 	Tags string `json:"tags" runner:"name:个人标签" widget:"type:multiselect;options:开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析;allow_create:true"`
 }
 
 // 简历投递响应结构
 type HrRecruitmentApplyResp struct {
-	// 处理结果
-	Success bool   `json:"success" runner:"name:是否成功" widget:"type:switch;true_label:成功;false_label:失败"`
+	// 框架标签：widget:"type:switch;true_label:成功;false_label:失败" - 开关组件，显示成功/失败状态
+	Success bool `json:"success" runner:"name:是否成功" widget:"type:switch;true_label:成功;false_label:失败"`
+
+	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件，显示处理结果信息
 	Message string `json:"message" runner:"name:处理结果" widget:"type:input;mode:text_area"`
 
-	// 简历信息
-	ResumeID int    `json:"resume_id" runner:"name:简历ID" widget:"type:number"`
-	Status   string `json:"status" runner:"name:简历状态" widget:"type:input"`
-	Tags     string `json:"tags" runner:"name:个人标签" widget:"type:input"`
+	// 框架标签：widget:"type:number" - 数字显示组件，显示简历ID
+	ResumeID int `json:"resume_id" runner:"name:简历ID" widget:"type:number"`
 
-	// 系统信息
+	// 框架标签：widget:"type:input" - 文本输入框组件，显示简历状态
+	Status string `json:"status" runner:"name:简历状态" widget:"type:input"`
+
+	// 框架标签：widget:"type:input" - 文本输入框组件，显示个人标签
+	Tags string `json:"tags" runner:"name:个人标签" widget:"type:input"`
+
+	// 框架标签：widget:"type:input" - 文本输入框组件，显示提交时间
 	SubmitTime string `json:"submit_time" runner:"name:提交时间" widget:"type:input"`
+
+	// 函数跳转链接 - 支持点击后跳转到简历列表页面
+	// 框架标签：widget:"type:function_link;auto_run:true;target:_blank" - 函数跳转组件，自动运行，新窗口打开
+	ListLink string `json:"list_link" runner:"name:查看我的简历" widget:"type:function_link;auto_run:true;target:_blank"`
 }
 
+// 简历列表请求结构
+type HrRecruitmentListReq struct {
+	// 框架标签：runner:"-" - 隐藏搜索，分页，等请求参数（无需在前端显示）
+	// 这个会自动处理这个数据表全部字段的自动实现分页，查询，排序等等
+	query.SearchFilterPageReq `runner:"-"`
+}
 
 // 简历投递处理函数
 func HrRecruitmentApply(ctx *runner.Context, req *HrRecruitmentApplyReq, resp response.Response) error {
@@ -2706,25 +2881,53 @@ func HrRecruitmentApply(ctx *runner.Context, req *HrRecruitmentApplyReq, resp re
 		return fmt.Errorf("简历投递失败: %v", err)
 	}
 
+	//'eq': '等于',
+	//'not_eq': '不等于',
+	//'like': '包含',
+	//'not_like': '不包含',
+	//'in': '属于',
+	//'not_in': '不属于',
+	//'gt': '大于',
+	//'gte': '大于等于',
+	//'lt': '小于',
+	//'lte': '小于等于',
+
+	// 生成跳转到列表页面的链接，携带ID参数定位到刚创建的记录，跳转到table函数需要用search里的标签配合下面的语句，form函数的话正常用那种query即可
+	listLink := ctx.GetFunctionUrl(&runner.FunctionUrl{
+		Title:        "查看我的简历",
+		RouterGroup:  RouterGroup,
+		FunctionName: "hr_recruitment_list",              // 跳转到列表页面,列表页面的参数相对比较特殊，需要用标签来
+		Query:        fmt.Sprintf("eq=id:%v", resume.ID), // 携带ID参数定位到刚创建的记录,&like=name:%s 这里可以不加，只是为了演示一下
+		//in=education:高中,大专  这里是查询高中和大专的记录
+		//gte=graduation_year:2019 毕业年份大雨等于2019的记录
+		//like=name:beiluo 名字包含beiluo的记录
+		//gte=graduation_year:2019&in=education:高中,大专  查询2019年及其以后高中或者大专毕业的记录
+	})
+	//
+
 	// 返回成功响应
 	return resp.Form(&HrRecruitmentApplyResp{
 		Success:    true,
-		Message:    "您的简历已成功投递！我们会尽快处理您的申请，请保持手机畅通。",
+		Message:    "您的简历已成功投递！点击下方链接查看您的简历状态。",
 		ResumeID:   resume.ID,
 		Status:     "待面试",
 		Tags:       resume.Tags,
 		SubmitTime: "刚刚",
+		ListLink:   listLink,
 	}).Build()
 }
 
 // 简历列表处理函数
-func HrRecruitmentList(ctx *runner.Context, req *query.SearchFilterPageReq, resp response.Response) error {
+func HrRecruitmentList(ctx *runner.Context, req *HrRecruitmentListReq, resp response.Response) error {
 	// 获取数据库连接
 	db := ctx.MustGetOrInitDB()
 	var rows []*HrRecruitment
 
 	// 自动处理分页、搜索、排序
-	queryBuilder := resp.Table(&rows).AutoPaginated(db, &HrRecruitment{}, req)
+	queryBuilder := resp.Table(&rows).AutoPaginated(db, &HrRecruitment{}, &req.SearchFilterPageReq)
+
+	// 列表页面不需要跳转链接，因为列表本身就显示了投递状态
+	// 用户可以直接在列表中查看所有简历的状态信息
 
 	return queryBuilder.Build()
 }
@@ -2749,7 +2952,7 @@ var HrRecruitmentListOption = &runner.TableFunctionOptions{
 		ApiDesc:      "HR简历管理系统，支持完整的CRUD操作",                  // API描述
 		Tags:         []string{"招聘系统", "简历管理", "HR管理"},        // 框架自动生成标签分类
 		CreateTables: []interface{}{&HrRecruitment{}},         // 创建数据表
-		Request:      &query.SearchFilterPageReq{},                 // 请求参数
+		Request:      &HrRecruitmentListReq{},                 // 请求参数
 		Response:     query.PaginatedTable[[]HrRecruitment]{}, // 响应参数
 		Group:        HrRecruitmentGroup,                      // 设置函数组
 	},
@@ -2801,12 +3004,11 @@ var HrRecruitmentListOption = &runner.TableFunctionOptions{
 
 // 路由注册
 func init() {
-	// 注册简历投递路由(用户侧)
+	// 注册简历投递路由
 	runner.Post(RouterGroup+"/hr_recruitment_apply", HrRecruitmentApply, HrRecruitmentApplyOption)
-	
-	
-	// 注册简历管理路由（管理侧）如果只是管理侧用，那就无需上面的了
+	// 注册简历管理路由
 	runner.Get(RouterGroup+"/hr_recruitment_list", HrRecruitmentList, HrRecruitmentListOption)
 }
+
 
 ```
