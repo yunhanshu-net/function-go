@@ -68,6 +68,7 @@ type BaseConfig struct {
 	FunctionType FunctionType `json:"function_type"` // 函数类型：static/dynamic/pure
 	Timeout      int          `json:"timeout"`
 
+	MustLogin bool `json:"must_login"`
 	// 权限配置
 	IsPublicApi bool `json:"is_public_api"`
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yunhanshu-net/pkg/trace"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -13,8 +14,6 @@ import (
 	"github.com/yunhanshu-net/pkg/dto/runnerproject"
 	"github.com/yunhanshu-net/pkg/logger"
 )
-
-var sub *nats.Subscription
 
 var conn *nats.Conn
 
@@ -27,11 +26,6 @@ func getConn() *nats.Conn {
 		conn = connect
 	}
 	return conn
-}
-
-func PushRuntime(msg *nats.Msg) error {
-	msg.Subject = "function-runner.sub"
-	return getConn().PublishMsg(msg)
 }
 
 // New 创建一个新的Runner实例
@@ -93,16 +87,16 @@ func (r *Runner) SubRunningCount(count uint) {
 	*r.runningCount -= count
 }
 
-func (r *Runner) call(ctx context.Context, msg *nats.Msg) ([]byte, error) {
-	data := msg.Data
-	var req request.RunFunctionReq
-	err1 := json.Unmarshal(data, &req)
-	if err1 != nil {
-		logger.Errorf(ctx, "call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
-		return nil, fmt.Errorf("call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
-	}
+func (r *Runner) call(ctx *Context, req *request.RunFunctionReq) ([]byte, error) {
+	//data := msg.Data
+	//var req request.RunFunctionRe q
+	//err1 := json.Unmarshal(data, &req)
+	//if err1 != nil {
+	//	logger.Errorf(ctx, "call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
+	//	return nil, fmt.Errorf("call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
+	//}
 
-	runResponse, err1 := r.runFunction(ctx, &req)
+	runResponse, err1 := r.runFunctionV2(ctx, req)
 	if err1 != nil {
 		logger.Errorf(ctx, "call runRequest err,req:%+v err:%s", req, err1.Error())
 		return nil, err1
@@ -166,8 +160,38 @@ func (r *Runner) connectNats(ctx context.Context) error {
 
 			// 创建响应消息
 			respMsg := nats.NewMsg("function-runner.sub")
-			ctx1 := context.WithValue(context.Background(), constants.TraceID, msg.Header.Get(constants.TraceID))
-			rspData, err := r.call(ctx1, msg)
+			//ctx1 := context.WithValue(context.Background(), constants.TraceID, msg.Header.Get(constants.TraceID))
+
+			data := msg.Data
+			var req request.RunFunctionReq
+			err1 := json.Unmarshal(data, &req)
+			if err1 != nil {
+				logger.Errorf(ctx, "call  json.Unmarshal(data, &req) err,req:%+v err:%s", req, err1.Error())
+				return
+			}
+
+			// 创建FunctionMsg
+			functionMsg := &trace.FunctionMsg{
+				User:         env.User,
+				Runner:       env.Name,
+				Version:      env.Version,
+				Method:       req.Method,
+				Router:       req.Router,
+				TraceID:      msg.Header.Get(constants.TraceID),
+				RequestUser:  msg.Header.Get(constants.RequestUserInfo),
+				UploadConfig: getUploadConfig(),
+			}
+			logger.Infof(ctx, "call RunFunction RequestUser:%s", functionMsg.RequestUser)
+
+			// 设置多个TraceID键，确保各种场景都能正确获取
+			c := context.WithValue(ctx, trace.FunctionMsgKey, functionMsg)
+			ctx2 := context.WithValue(c, constants.TraceID, functionMsg.TraceID)
+			//// 同时设置pkg/logger期望的键
+			//c = logger.WithContext(ctx, functionMsg.TraceID)
+			newContext := NewContext(ctx2, req.Method, req.Router, r)
+			newContext.FunctionMsg = functionMsg
+
+			rspData, err := r.call(newContext, &req)
 
 			respMsg.Header = msg.Header
 			if err != nil {

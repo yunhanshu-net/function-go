@@ -90,7 +90,8 @@ type Context struct {
 	router string
 	method string
 
-	Locker *Lock
+	FunctionMsg *trace.FunctionMsg
+	Locker      *Lock
 	// Logger 绑定的日志记录器
 	Logger *ContextLogger
 
@@ -103,6 +104,7 @@ type FunctionUrl struct {
 	RouterGroup  string
 	FunctionName string
 	Query        string
+	AutoRun      bool // 是否自动运行
 
 	FullPath string
 }
@@ -122,18 +124,34 @@ func (c *Context) GetFunctionUrl(option *FunctionUrl) string {
 
 	///demo8/business/cdn/cdn_file_share_list
 	if len(option.Query) == 0 { // 这种一般只能在当前项目跳转
-		return fmt.Sprintf("[%s]/%s/%s/%s/%s", option.Title,
+		url := fmt.Sprintf("[%s]/%s/%s/%s/%s", option.Title,
 			strings.Trim(c.user, "/"),
 			strings.Trim(c.name, "/"),
 			strings.Trim(option.RouterGroup, "/"),
 			strings.Trim(option.FunctionName, "/"))
 
+		// 如果设置了自动运行，添加auto_run参数
+		if option.AutoRun {
+			url += "?_auto_run=true"
+		}
+		return url
 	}
+
+	// 构建查询参数
+	queryParams := option.Query
+	if option.AutoRun {
+		if queryParams == "" {
+			queryParams = "_auto_run=true"
+		} else {
+			queryParams += "&_auto_run=true"
+		}
+	}
+
 	return fmt.Sprintf("[%s]/%s/%s/%s/%s?%s", option.Title,
 		strings.Trim(c.user, "/"),
 		strings.Trim(c.name, "/"),
 		strings.Trim(option.RouterGroup, "/"),
-		strings.Trim(option.FunctionName, "/"), option.Query)
+		strings.Trim(option.FunctionName, "/"), queryParams)
 }
 
 func (c *Context) Now() time.Time {
@@ -146,37 +164,11 @@ func (c *Context) Since(time2 time.Time) time.Duration {
 
 func NewContext(ctx context.Context, method string, router string, runner *Runner) *Context {
 	// 获取trace_id
-	traceID := ""
-	if value := ctx.Value(constants.TraceID); value != nil {
-		if tid, ok := value.(string); ok {
-			traceID = tid
-		}
-	}
-	if traceID == "" {
-		// 如果没有trace_id，生成一个简单的
-		traceID = fmt.Sprintf("ctx-%d", time.Now().UnixNano())
-	}
 
-	// 创建FunctionMsg
-	functionMsg := &trace.FunctionMsg{
-		User:         env.User,
-		Runner:       env.Name,
-		Version:      env.Version,
-		Method:       method,
-		Router:       router,
-		TraceID:      traceID,
-		UploadConfig: getUploadConfig(),
-	}
-
-	// 设置多个TraceID键，确保各种场景都能正确获取
-	c := context.WithValue(ctx, trace.FunctionMsgKey, functionMsg)
-	c = context.WithValue(c, constants.TraceID, traceID)
-	// 同时设置pkg/logger期望的键
-	c = logger.WithContext(c, traceID)
+	//
 
 	// 创建Context实例
 	contextInstance := &Context{
-		Context: c,
 		runner:  runner,
 		user:    env.User,
 		name:    env.Name,
@@ -185,9 +177,52 @@ func NewContext(ctx context.Context, method string, router string, runner *Runne
 		router:  router,
 		Locker:  newLock(), //分布式锁
 	}
+	contextInstance.Context = ctx
+	//v, ok := ctx.Value(trace.FunctionMsgKey).(*trace.FunctionMsg)
+	//if ok {
+	//	contextInstance.FunctionMsg = v
+	//	contextInstance.Context = ctx
+	//} else {
+	//	traceID := ""
+	//	if value := ctx.Value(constants.TraceID); value != nil {
+	//		if tid, ok := value.(string); ok {
+	//			traceID = tid
+	//		}
+	//	}
+	//	if traceID == "" {
+	//		// 如果没有trace_id，生成一个简单的
+	//		traceID = fmt.Sprintf("ctx-%d", time.Now().UnixNano())
+	//	}
+	//	//// 创建FunctionMsg
+	//	functionMsg := &trace.FunctionMsg{
+	//		User:         env.User,
+	//		Runner:       env.Name,
+	//		Version:      env.Version,
+	//		Method:       method,
+	//		Router:       router,
+	//		TraceID:      traceID,
+	//		RequestUser:  "unknown1",
+	//		UploadConfig: getUploadConfig(),
+	//	}
+	//	//// 设置多个TraceID键，确保各种场景都能正确获取
+	//	c := context.WithValue(ctx, trace.FunctionMsgKey, functionMsg)
+	//	c = context.WithValue(c, constants.TraceID, traceID)
+	//	// 同时设置pkg/logger期望的键
+	//	c = logger.WithContext(c, traceID)
+	//
+	//	contextInstance.FunctionMsg = functionMsg
+	//	contextInstance.Context = ctx
+	//
+	//}
+	//
+	//// 设置多个TraceID键，确保各种场景都能正确获取
+	//c := context.WithValue(ctx, trace.FunctionMsgKey, functionMsg)
+	//c = context.WithValue(c, constants.TraceID, traceID)
+	//// 同时设置pkg/logger期望的键
+	//c = logger.WithContext(c, traceID)
 
 	// 初始化Logger，使用新的创建方法
-	contextInstance.Logger = newContextLogger(c)
+	contextInstance.Logger = newContextLogger(ctx)
 
 	return contextInstance
 }
@@ -209,7 +244,7 @@ func (c *Context) getTraceId() string {
 }
 
 func (c *Context) GetUsername() string {
-	return ""
+	return c.FunctionMsg.RequestUser
 }
 
 type UserInfo struct {
@@ -221,7 +256,7 @@ func (c *Context) GetUserInfo() UserInfo {
 
 	return UserInfo{
 		IsLoggedIn: true,
-		Username:   "admin",
+		Username:   c.FunctionMsg.RequestUser,
 	}
 }
 

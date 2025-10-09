@@ -946,8 +946,8 @@ func CrmTicketList(ctx *runner.Context, req *CrmTicketListReq, resp response.Res
 // 自动CRUD配置
 var CrmTicketListOption = &runner.TableFunctionOptions{
 	BaseConfig: runner.BaseConfig{
-		ChineseName: "CRM工单管理",                               // API中文名称
-		ApiDesc:     "工单管理系统",                                // API描述
+		ChineseName: "CRM工单管理",  // API中文名称
+		ApiDesc:     "工单管理系统", // API描述
 		Tags:        []string{"工单系统", "政务系统", "工单管理", "CRM"}, // 框架自动生成标签分类
 		// 框架功能：CreateTables - 服务启动时自动创建数据表
 		CreateTables: []interface{}{&CrmTicket{}},
@@ -968,7 +968,11 @@ var CrmTicketListOption = &runner.TableFunctionOptions{
 		if err := req.DecodeBy(&addRows); err != nil {
 			return nil, err
 		}
-		for _, row := range addRows { //如果记录中存在创建用户字段的话，可以从ctx.GetUserInfo()获取用户信息
+		//这个可以判断是否是登录用户的请求
+		//if ctx.GetUserInfo().IsLoggedIn{
+		//}
+		
+		for _, row := range addRows { //如果记录中存在创建用户字段的话，可以从ctx.GetUserInfo()获取用户信息，GetUserInfo 返回的不是指针，可以直接用Username
 			row.CreateBy = ctx.GetUserInfo().Username //【框架规范】获取用户信息
 		}
 		//把记录写入db，写入前后都可以做一些操作
@@ -2560,16 +2564,22 @@ func init() {
 
 table函数最佳实践：招聘管理系统
 用户需求：
-需要一个招聘管理系统，用户可以发起简历投递，简历用附件的形式上传，然后填写自己的个人信息，然后管理员可以进行简历的增删改查，每个简历都应该有自己的状态，待面试，已面试，已通过，已落选，然后可以投递的职位分为，前端开发岗位，后端开发岗，运营岗，运维岗，美术岗，设计岗，产品岗
+需要一个招聘管理系统，用户可以发起简历投递，简历用附件的形式上传，然后填写自己的个人信息，然后可以进行简历的增删改查，每个简历都应该有自己的状态，待面试，已面试，已通过，已落选，然后可以投递的职位分为，前端开发岗位，后端开发岗，运营岗，运维岗，美术岗，设计岗，产品岗
 另外可以选择的工作地有：北京，上海，深圳，广州，南京，武汉，成都，重庆，杭州 这些
-同时用户可以选择自己的标签：默认可选项（开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析）允许自定义多选值
+同时用户可以选择自己的标签：默认可选项（开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析）允许自定义多选值，
+简历管理里可以有一个约面操作，
+如果没约面可以点击跳转到约面的页面，如果已经约面可以点击跳转到约面记录
+
+约面记录就记录求职者约面的记录信息，记录用户和面试官，约面地点，约面开始和结束时间等等，可以添加备注
 
 ```go
 // 文件名：hr_recruitment.go
 package hr
 
 import (
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/yunhanshu-net/function-go/pkg/dto/response"
 	"github.com/yunhanshu-net/function-go/pkg/dto/usercall"
@@ -2721,125 +2731,75 @@ type HrRecruitment struct {
 	// 框架标签：search:"like" - 启用模糊搜索功能
 	Remark string `json:"remark" gorm:"column:remark" runner:"name:备注" widget:"type:input;mode:text_area" search:"like"`
 
-	// 框架标签：widget:"type:user" - 用户组件
+	// 框架标签：widget:"type:user" - 用户组件，create_by 这个字段不能换，必须用这个字段
 	// 框架标签：search:"like" - 启用模糊搜索功能
 	CreateBy string `json:"create_by" gorm:"column:create_by" runner:"name:投递人" widget:"type:user" search:"like"`
+
+	// 约面状态
+	// 【重要说明】此字段为后续新增字段，用于兼容历史数据
+	// 历史数据中此字段为NULL，新数据默认为"未约面"
+	// 在Go中，数据库NULL值会被转换为空字符串""，需要特殊处理
+	InterviewStatus string `json:"interview_status" gorm:"column:interview_status;comment:约面状态" runner:"name:约面状态" widget:"type:select;options:未约面,已约面,已取消" data:"default_value:未约面" search:"in" validate:"required,oneof=未约面 已约面 已取消"`
+
+	// 约面链接（动态生成）
+	InterviewLink string `json:"interview_link" gorm:"-" runner:"name:约面操作" widget:"type:function_link;target:_blank" permission:"read"`
 }
 
 // 指定数据库表名
 func (HrRecruitment) TableName() string { return "hr_recruitment" }
 
-// 简历投递请求结构
-type HrRecruitmentApplyReq struct {
-	// 框架标签：widget:"type:input" - 文本输入框组件
-	// 框架标签：validate:"required,min=2,max=20" - 必填字段，长度2-20字符
-	Name string `json:"name" runner:"name:姓名" widget:"type:input" validate:"required,min=2,max=20"`
+// ================ 约面记录数据模型 ================
 
-	// 框架标签：widget:"type:input" - 文本输入框组件
-	// 框架标签：validate:"required,min=11,max=11" - 必填字段，长度必须为11位
-	Phone string `json:"phone" runner:"name:手机号" widget:"type:input" validate:"required,min=11,max=11"`
+// HrRecruitmentInterview 约面记录表
+type HrRecruitmentInterview struct {
+	// 系统字段
+	ID        int            `json:"id" gorm:"primaryKey;autoIncrement" runner:"name:约面ID" permission:"read"`
+	CreatedAt int64          `json:"created_at" gorm:"autoCreateTime:milli" runner:"name:创建时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime:milli" runner:"name:更新时间" widget:"type:datetime;kind:datetime" permission:"read"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" runner:"-"`
 
-	// 框架标签：widget:"type:input" - 文本输入框组件
-	// 框架标签：validate:"required,email" - 必填字段，必须是有效的邮箱格式
-	Email string `json:"email" runner:"name:邮箱" widget:"type:input" validate:"required,email"`
+	// 关联简历
+	ResumeID   int    `json:"resume_id" gorm:"column:resume_id;comment:简历ID;index" runner:"name:简历ID" widget:"type:select" search:"in" validate:"required"`
+	ResumeName string `json:"resume_name" gorm:"-" runner:"name:求职者姓名" widget:"type:input" permission:"read"`
 
-	// 框架标签：widget:"type:number;min:18;max:65;unit:岁" - 数字输入组件，最小值18，最大值65，单位岁
-	// 框架标签：validate:"required,min=18,max=65" - 必填字段，年龄范围18-65岁
-	Age int `json:"age" runner:"name:年龄" widget:"type:number;min:18;max:65;unit:岁" validate:"required,min=18,max=65"`
+	// 约面时间
+	StartTime int64 `json:"start_time" gorm:"column:start_time;comment:开始时间" runner:"name:开始时间" widget:"type:datetime;kind:datetime" search:"gte,lte" validate:"required"`
+	EndTime   int64 `json:"end_time" gorm:"column:end_time;comment:结束时间" runner:"name:结束时间" widget:"type:datetime;kind:datetime" search:"gte,lte" validate:"required,gtfield=StartTime"`
 
-	// 框架标签：widget:"type:select;options:男,女" - 下拉选择组件（选项：男/女）
-	// 框架标签：validate:"required,oneof=男 女" - 必填字段，值必须是选项之一
-	Gender string `json:"gender" runner:"name:性别" widget:"type:select;options:男,女" validate:"required,oneof=男 女"`
+	// 约面信息
+	Interviewer string `json:"interviewer" gorm:"column:interviewer;comment:面试官" runner:"name:面试官" widget:"type:user" search:"like" validate:"required"`
+	Location    string `json:"location" gorm:"column:location;comment:面试地点" runner:"name:面试地点" widget:"type:input" search:"like" data:"example:会议室A"`
+	Notes       string `json:"notes" gorm:"column:notes;comment:备注" runner:"name:备注" widget:"type:input;mode:text_area" search:"like"`
 
-	// 框架标签：widget:"type:select;options:高中,大专,本科,硕士,博士" - 下拉选择组件
-	// 框架标签：validate:"required" - 必填字段
-	Education string `json:"education" runner:"name:学历" widget:"type:select;options:高中,大专,本科,硕士,博士" validate:"required"`
+	// 状态
+	Status string `json:"status" gorm:"column:status;comment:约面状态" runner:"name:约面状态" widget:"type:select;options:待面试,已完成,已取消" data:"default_value:待面试" search:"in" validate:"required,oneof=待面试 已完成 已取消"`
 
-	// 条件字段：当学历=硕士或博士时显示毕业院校
-	// 框架标签：widget:"type:input" - 文本输入框组件
-	// 框架标签：validate:"required_if=education 博士" - 当学历=博士时必填
-	GraduateSchool string `json:"graduate_school" runner:"name:毕业院校" widget:"type:input" data:"example:清华大学" validate:"required_if=education 博士"`
-
-	// 条件字段：当学历=博士时显示研究方向
-	// 框架标签：widget:"type:input" - 文本输入框组件
-	// 框架标签：validate:"required_if=education 博士" - 当学历=博士时必填
-	ResearchField string `json:"research_field" runner:"name:研究方向" widget:"type:input" data:"example:人工智能" validate:"required_if=education 博士"`
-
-	// 框架标签：widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" - 下拉选择组件
-	// 框架标签：validate:"required" - 必填字段
-	Position string `json:"position" runner:"name:应聘职位" widget:"type:select;options:前端开发岗,后端开发岗,运营岗,运维岗,美术岗,设计岗,产品岗" validate:"required"`
-
-	// 框架标签：widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" - 下拉选择组件
-	// 框架标签：validate:"required" - 必填字段
-	WorkCity string `json:"work_city" runner:"name:期望工作地" widget:"type:select;options:北京,上海,深圳,广州,南京,武汉,成都,重庆,杭州" validate:"required"`
-
-	// 框架标签：widget:"type:select;options:应届生,1年以下,1-3年,3-5年,5-10年,10年以上" - 下拉选择组件
-	// 框架标签：validate:"required" - 必填字段
-	Experience string `json:"experience" runner:"name:工作经验" widget:"type:select;options:应届生,1年以下,1-3年,3-5年,5-10年,10年以上" validate:"required"`
-
-	// 条件字段：当工作经验=应届生时显示毕业时间字段
-	// 框架标签：widget:"type:number;min:2020;max:2030;unit:年" - 数字输入组件，最小值2020，最大值2030，单位年
-	// 框架标签：validate:"required_if=experience 应届生,min=2020,max=2030" - 当工作经验=应届生时必填
-	GraduationYear int `json:"graduation_year" runner:"name:毕业年份" widget:"type:number;min:2020;max:2030;unit:年" data:"default_value:2024;example:2024" validate:"required_if=experience 应届生,min=2020,max=2030"`
-
-	// 条件字段：当工作经验=应届生时显示实习经历
-	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
-	// 框架标签：validate:"required_if=experience 应届生" - 当工作经验=应届生时必填
-	InternshipExperience string `json:"internship_experience" runner:"name:实习经历" widget:"type:input;mode:text_area" data:"example:在XX公司实习3个月，负责前端开发" validate:"required_if=experience 应届生"`
-
-	// 条件字段：当工作经验≠应届生时显示项目经验
-	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
-	// 框架标签：validate:"required_unless=experience 应届生" - 当工作经验≠应届生时必填
-	ProjectExperience string `json:"project_experience" runner:"name:项目经验" widget:"type:input;mode:text_area" data:"example:负责XX项目的架构设计和开发" validate:"required_unless=experience 应届生"`
-
-	// 框架标签：widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" - 下拉选择组件
-	// 框架标签：validate:"required" - 必填字段
-	Salary string `json:"salary" runner:"name:期望薪资" widget:"type:select;options:5K以下,5K-10K,10K-15K,15K-20K,20K-30K,30K以上" validate:"required"`
-
-	// 条件字段：当期望薪资=30K以上时显示具体薪资
-	// 框架标签：widget:"type:number;min:30000;max:100000;unit:元" - 数字输入组件，最小值30000，最大值100000，单位元
-	// 框架标签：validate:"required_if=salary 30K以上,min=30000,max=100000" - 当期望薪资=30K以上时必填
-	SpecificSalary int `json:"specific_salary" runner:"name:具体期望薪资" widget:"type:number;min:30000;max:100000;unit:元" data:"example:35000" validate:"required_if=salary 30K以上,min=30000,max=100000"`
-
-	// 框架标签：widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" - 文件上传组件
-	// 框架标签：accept:.pdf,.doc,.docx - 允许上传的文件类型
-	// 框架标签：validate:"required" - 必填字段
-	Resume *files.Files `json:"resume" runner:"name:简历附件" widget:"type:file_upload;accept:.pdf,.doc,.docx;max_size:10MB" validate:"required"`
-
-	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件
-	// 框架标签：validate:"required,min=20,max=500" - 必填字段，长度20-500字符
-	Introduce string `json:"introduce" runner:"name:自我介绍" widget:"type:input;mode:text_area" validate:"required,min=20,max=500"`
-
-	// 框架标签：widget:"type:multiselect;options:开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析;allow_create:true" - 多选组件
-	// 框架标签：allow_create:true - 允许创建自定义标签
-	// 注意：multiselect有两种类型，一种string的会用,号分隔多个值，第二种[]string，会直接用切片存储多个值
-	// 为了方便存储到数据库我们选择用string
-	Tags string `json:"tags" runner:"name:个人标签" widget:"type:multiselect;options:开源项目,AI编程,全栈开发,经验丰富,应届生,懂运维,数据分析;allow_create:true"`
+	// 关联Model
+	Resume *HrRecruitment `json:"-" runner:"-" gorm:"foreignKey:ResumeID"`
 }
 
-// 简历投递响应结构
-type HrRecruitmentApplyResp struct {
-	// 框架标签：widget:"type:switch;true_label:成功;false_label:失败" - 开关组件，显示成功/失败状态
-	Success bool `json:"success" runner:"name:是否成功" widget:"type:switch;true_label:成功;false_label:失败"`
+func (HrRecruitmentInterview) TableName() string { return "hr_recruitment_interview" }
 
-	// 框架标签：widget:"type:input;mode:text_area" - 多行文本区域组件，显示处理结果信息
-	Message string `json:"message" runner:"name:处理结果" widget:"type:input;mode:text_area"`
+// ================ 约面Form函数 ================
 
-	// 框架标签：widget:"type:number" - 数字显示组件，显示简历ID
-	ResumeID int `json:"resume_id" runner:"name:简历ID" widget:"type:number"`
+// HrRecruitmentInterviewScheduleReq 约面安排请求
+type HrRecruitmentInterviewScheduleReq struct {
+	ResumeID    int    `json:"resume_id" runner:"name:选择简历" widget:"type:select" validate:"required"`
+	StartTime   int64  `json:"start_time" runner:"name:开始时间" widget:"type:datetime;kind:datetime" validate:"required"`
+	EndTime     int64  `json:"end_time" runner:"name:结束时间" widget:"type:datetime;kind:datetime" validate:"required,gtfield=StartTime"`
+	Interviewer string `json:"interviewer" runner:"name:面试官" widget:"type:user" validate:"required"`
+	Location    string `json:"location" runner:"name:面试地点" widget:"type:input" data:"example:会议室A"`
+	Notes       string `json:"notes" runner:"name:备注" widget:"type:input;mode:text_area"`
+}
 
-	// 框架标签：widget:"type:input" - 文本输入框组件，显示简历状态
-	Status string `json:"status" runner:"name:简历状态" widget:"type:input"`
-
-	// 框架标签：widget:"type:input" - 文本输入框组件，显示个人标签
-	Tags string `json:"tags" runner:"name:个人标签" widget:"type:input"`
-
-	// 框架标签：widget:"type:input" - 文本输入框组件，显示提交时间
-	SubmitTime string `json:"submit_time" runner:"name:提交时间" widget:"type:input"`
-
-	// 函数跳转链接 - 支持点击后跳转到简历列表页面
-	// 框架标签：widget:"type:function_link;auto_run:true;target:_blank" - 函数跳转组件，自动运行，新窗口打开
-	ListLink string `json:"list_link" runner:"name:查看我的简历" widget:"type:function_link;auto_run:true;target:_blank"`
+// HrRecruitmentInterviewScheduleResp 约面安排响应
+type HrRecruitmentInterviewScheduleResp struct {
+	Success       bool   `json:"success" runner:"name:是否成功" widget:"type:switch;true_label:成功;false_label:失败"`
+	Message       string `json:"message" runner:"name:处理结果" widget:"type:input;mode:text_area"`
+	InterviewID   int    `json:"interview_id" runner:"name:约面ID" widget:"type:number"`
+	ResumeName    string `json:"resume_name" runner:"name:求职者姓名" widget:"type:input"`
+	InterviewTime string `json:"interview_time" runner:"name:约面时间" widget:"type:input"`
+	FunctionLink  string `json:"function_link" runner:"name:查看约面记录" widget:"type:function_link;auto_run:true;target:_blank"`
 }
 
 // 简历列表请求结构
@@ -2847,74 +2807,6 @@ type HrRecruitmentListReq struct {
 	// 框架标签：runner:"-" - 隐藏搜索，分页，等请求参数（无需在前端显示）
 	// 这个会自动处理这个数据表全部字段的自动实现分页，查询，排序等等
 	query.SearchFilterPageReq `runner:"-"`
-}
-
-// 简历投递处理函数
-func HrRecruitmentApply(ctx *runner.Context, req *HrRecruitmentApplyReq, resp response.Response) error {
-	// 获取数据库连接
-	db := ctx.MustGetOrInitDB()
-
-	// 获取当前用户信息
-	userInfo := ctx.GetUserInfo()
-
-	// 创建简历记录
-	resume := &HrRecruitment{
-		Name:       req.Name,
-		Phone:      req.Phone,
-		Email:      req.Email,
-		Age:        req.Age,
-		Gender:     req.Gender,
-		Education:  req.Education,
-		Position:   req.Position,
-		WorkCity:   req.WorkCity,
-		Experience: req.Experience,
-		Salary:     req.Salary,
-		Resume:     req.Resume,
-		Introduce:  req.Introduce,
-		Tags:       req.Tags,
-		Status:     "待面试", // 默认状态为待面试
-		CreateBy:   userInfo.Username,
-	}
-
-	// 保存简历到数据库
-	if err := db.Create(resume).Error; err != nil {
-		return fmt.Errorf("简历投递失败: %v", err)
-	}
-
-	//'eq': '等于',
-	//'not_eq': '不等于',
-	//'like': '包含',
-	//'not_like': '不包含',
-	//'in': '属于',
-	//'not_in': '不属于',
-	//'gt': '大于',
-	//'gte': '大于等于',
-	//'lt': '小于',
-	//'lte': '小于等于',
-
-	// 生成跳转到列表页面的链接，携带ID参数定位到刚创建的记录，跳转到table函数需要用search里的标签配合下面的语句，form函数的话正常用那种query即可
-	listLink := ctx.GetFunctionUrl(&runner.FunctionUrl{
-		Title:        "查看我的简历",
-		RouterGroup:  RouterGroup,
-		FunctionName: "hr_recruitment_list",              // 跳转到列表页面,列表页面的参数相对比较特殊，需要用标签来
-		Query:        fmt.Sprintf("eq=id:%v", resume.ID), // 携带ID参数定位到刚创建的记录,&like=name:%s 这里可以不加，只是为了演示一下
-		//in=education:高中,大专  这里是查询高中和大专的记录
-		//gte=graduation_year:2019 毕业年份大雨等于2019的记录
-		//like=name:beiluo 名字包含beiluo的记录
-		//gte=graduation_year:2019&in=education:高中,大专  查询2019年及其以后高中或者大专毕业的记录
-	})
-	//
-
-	// 返回成功响应
-	return resp.Form(&HrRecruitmentApplyResp{
-		Success:    true,
-		Message:    "您的简历已成功投递！点击下方链接查看您的简历状态。",
-		ResumeID:   resume.ID,
-		Status:     "待面试",
-		Tags:       resume.Tags,
-		SubmitTime: "刚刚",
-		ListLink:   listLink,
-	}).Build()
 }
 
 // 简历列表处理函数
@@ -2926,35 +2818,174 @@ func HrRecruitmentList(ctx *runner.Context, req *HrRecruitmentListReq, resp resp
 	// 自动处理分页、搜索、排序
 	queryBuilder := resp.Table(&rows).AutoPaginated(db, &HrRecruitment{}, &req.SearchFilterPageReq)
 
-	// 列表页面不需要跳转链接，因为列表本身就显示了投递状态
-	// 用户可以直接在列表中查看所有简历的状态信息
+	// 填充约面链接
+	for i := range rows {
+		// 【重要说明】处理约面状态判断，兼容历史数据
+		// interview_status字段为后续新增字段，历史数据中此字段为NULL
+		// 在Go中，数据库NULL值会被转换为空字符串""，需要特殊处理
+		// 判断逻辑：空字符串（历史数据）或"未约面"（新数据）→ 显示"安排约面"链接
+		// 判断逻辑："已约面"或"已取消" → 显示"查看约面记录"链接
+		if rows[i].InterviewStatus == "" || rows[i].InterviewStatus == "未约面" {
+			// 未约面或存量数据（NULL值）：跳转到约面页面
+			// 【框架说明】跳转到Form函数，使用常规query参数格式
+			// 格式：key=value&key2=value2
+			// 示例：resume_id=123&password=456
+			rows[i].InterviewLink = ctx.GetFunctionUrl(&runner.FunctionUrl{
+				Title:        "安排约面",
+				RouterGroup:  RouterGroup,
+				FunctionName: "hr_recruitment_interview_schedule",
+				Query:        fmt.Sprintf("resume_id=%d", rows[i].ID),
+			})
+		} else {
+			// 已约面或已取消：跳转到约面记录
+			// 【框架说明】跳转到Table函数，使用search标签格式
+			// 格式：eq=字段名:值&sort=字段名:desc
+			// 示例：eq=resume_id:123&sort=id:desc
+			// 支持的search标签格式：
+			// - eq=字段名:值 - 精确匹配
+			// - in=字段名:值1,值2 - 多值匹配
+			// - like=字段名:关键词 - 模糊搜索
+			// - gte/gt/lt/lte=字段名:值 - 数值比较
+			// - sort=字段名:asc/desc - 排序
+			rows[i].InterviewLink = ctx.GetFunctionUrl(&runner.FunctionUrl{
+				Title:        "查看约面记录",
+				RouterGroup:  RouterGroup,
+				FunctionName: "hr_recruitment_interview_list",
+				Query:        fmt.Sprintf("eq=resume_id:%d&sort=id:desc", rows[i].ID),
+			})
+		}
+	}
 
 	return queryBuilder.Build()
 }
 
-// 简历投递配置
-var HrRecruitmentApplyOption = &runner.FormFunctionOptions{
-	BaseConfig: runner.BaseConfig{
-		ChineseName:  "简历投递",                           // API中文名称
-		ApiDesc:      "用户投递简历申请职位",                     // API描述
-		Tags:         []string{"招聘系统", "简历投递", "求职申请"}, // 框架自动生成标签分类
-		CreateTables: []interface{}{&HrRecruitment{}},  // 创建数据表
-		Request:      &HrRecruitmentApplyReq{},         // 请求参数
-		Response:     &HrRecruitmentApplyResp{},        // 响应参数
-		Group:        HrRecruitmentGroup,               // 设置函数组
-	},
+// HrRecruitmentInterviewSchedule 约面安排处理函数
+func HrRecruitmentInterviewSchedule(ctx *runner.Context, req *HrRecruitmentInterviewScheduleReq, resp response.Response) error {
+	db := ctx.MustGetOrInitDB()
+
+	// 查询简历信息
+	var resume HrRecruitment
+	if err := db.Where("id = ?", req.ResumeID).First(&resume).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return resp.Form(&HrRecruitmentInterviewScheduleResp{
+				Success: false,
+				Message: "简历不存在",
+			}).Build()
+		}
+		return resp.Form(&HrRecruitmentInterviewScheduleResp{
+			Success: false,
+			Message: fmt.Sprintf("查询简历失败: %v", err),
+		}).Build()
+	}
+
+	// 检查是否已经约面
+	// 【重要说明】处理约面状态检查，兼容历史数据
+	// interview_status字段为后续新增字段，历史数据中此字段为NULL
+	// 在Go中，数据库NULL值会被转换为空字符串""，允许安排约面
+	// 只有明确标记为"已约面"或"已取消"的简历才不允许重复安排约面
+	if resume.InterviewStatus == "已约面" || resume.InterviewStatus == "已取消" {
+		return resp.Form(&HrRecruitmentInterviewScheduleResp{
+			Success:    false,
+			Message:    "该简历已经安排约面，请查看约面记录",
+			ResumeName: resume.Name,
+		}).Build()
+	}
+
+	// 创建约面记录
+	interview := &HrRecruitmentInterview{
+		ResumeID:    req.ResumeID,
+		StartTime:   req.StartTime,
+		EndTime:     req.EndTime,
+		Interviewer: req.Interviewer,
+		Location:    req.Location,
+		Notes:       req.Notes,
+		Status:      "待面试",
+	}
+
+	if err := db.Create(interview).Error; err != nil {
+		return resp.Form(&HrRecruitmentInterviewScheduleResp{
+			Success:    false,
+			Message:    fmt.Sprintf("创建约面记录失败: %v", err),
+			ResumeName: resume.Name,
+		}).Build()
+	}
+
+	// 更新简历约面状态
+	if err := db.Model(&resume).Update("interview_status", "已约面").Error; err != nil {
+		ctx.Logger.Errorf("更新简历约面状态失败: %v", err)
+	}
+
+	// 生成查看约面记录链接
+	// 【框架说明】跳转到Table函数，使用search标签格式
+	// 格式：eq=字段名:值&sort=字段名:desc
+	// 示例：eq=resume_id:123&sort=id:desc
+	// 支持的search标签格式：
+	// - eq=字段名:值 - 精确匹配
+	// - in=字段名:值1,值2 - 多值匹配
+	// - like=字段名:关键词 - 模糊搜索
+	// - gte/gt/lt/lte=字段名:值 - 数值比较
+	// - sort=字段名:asc/desc - 排序
+	functionLink := ctx.GetFunctionUrl(&runner.FunctionUrl{
+		Title:        "查看约面记录",
+		RouterGroup:  RouterGroup,
+		FunctionName: "hr_recruitment_interview_list",
+		Query:        fmt.Sprintf("eq=resume_id:%d&sort=id:desc", req.ResumeID),
+		AutoRun:      true, // 自动运行，用户点击后直接显示结果
+	})
+
+	return resp.Form(&HrRecruitmentInterviewScheduleResp{
+		Success:       true,
+		Message:       "约面安排成功！",
+		InterviewID:   interview.ID,
+		ResumeName:    resume.Name,
+		InterviewTime: time.UnixMilli(req.StartTime).Format("2006-01-02 15:04") + " - " + time.UnixMilli(req.EndTime).Format("15:04"),
+		FunctionLink:  functionLink,
+	}).Build()
+}
+
+// ================ 约面记录Table函数 ================
+
+// HrRecruitmentInterviewListReq 约面记录列表请求
+type HrRecruitmentInterviewListReq struct {
+	query.SearchFilterPageReq `runner:"-"`
+}
+
+// HrRecruitmentInterviewList 约面记录列表处理函数
+func HrRecruitmentInterviewList(ctx *runner.Context, req *HrRecruitmentInterviewListReq, resp response.Response) error {
+	db := ctx.MustGetOrInitDB()
+	var rows []*HrRecruitmentInterview
+
+	// 【框架说明】使用Preload避免N+1查询问题
+	// 支持的查询参数格式：
+	// - eq=resume_id:123 - 精确匹配简历ID
+	// - in=status:待面试,已完成 - 多值匹配状态
+	// - like=interviewer:面试官 - 按面试官模糊搜索
+	// - gte=start_time:时间戳 - 按开始时间筛选
+	// - sort=start_time:desc - 按开始时间降序排列（最新的约面在前）
+	// - sort=id:desc - 按ID降序排列
+	query := db.Model(&HrRecruitmentInterview{}).Preload("Resume")
+	queryBuilder := resp.Table(&rows).AutoPaginated(query, &HrRecruitmentInterview{}, &req.SearchFilterPageReq)
+
+	// 【性能优化】填充计算字段，使用预加载的Resume数据
+	for i := range rows {
+		if rows[i].Resume != nil && rows[i].Resume.ID > 0 {
+			rows[i].ResumeName = rows[i].Resume.Name
+		}
+	}
+
+	return queryBuilder.Build()
 }
 
 // 简历管理配置
 var HrRecruitmentListOption = &runner.TableFunctionOptions{
 	BaseConfig: runner.BaseConfig{
-		ChineseName:  "简历管理",                                  // API中文名称
-		ApiDesc:      "HR简历管理系统，支持完整的CRUD操作",                  // API描述
-		Tags:         []string{"招聘系统", "简历管理", "HR管理"},        // 框架自动生成标签分类
-		CreateTables: []interface{}{&HrRecruitment{}},         // 创建数据表
-		Request:      &HrRecruitmentListReq{},                 // 请求参数
-		Response:     query.PaginatedTable[[]HrRecruitment]{}, // 响应参数
-		Group:        HrRecruitmentGroup,                      // 设置函数组
+		ChineseName:  "简历管理",                                                     // API中文名称
+		ApiDesc:      "HR简历管理系统，支持完整的CRUD操作",                                     // API描述
+		Tags:         []string{"招聘系统", "简历管理", "HR管理"},                           // 框架自动生成标签分类
+		CreateTables: []interface{}{&HrRecruitment{}, &HrRecruitmentInterview{}}, // 创建数据表
+		Request:      &HrRecruitmentListReq{},                                    // 请求参数
+		Response:     query.PaginatedTable[[]HrRecruitment]{},                    // 响应参数
+		Group:        HrRecruitmentGroup,                                         // 设置函数组
 	},
 
 	// 自动CRUD
@@ -3002,13 +3033,179 @@ var HrRecruitmentListOption = &runner.TableFunctionOptions{
 	},
 }
 
+// ================ 约面系统配置 ================
+
+// HrRecruitmentInterviewScheduleOption 约面安排配置
+var HrRecruitmentInterviewScheduleOption = &runner.FormFunctionOptions{
+	BaseConfig: runner.BaseConfig{
+		ChineseName:  "约面安排",
+		ApiDesc:      "为求职者安排面试，设置面试时间、地点、面试官等信息",
+		Tags:         []string{"招聘系统", "约面管理"},
+		Request:      &HrRecruitmentInterviewScheduleReq{},
+		Response:     &HrRecruitmentInterviewScheduleResp{},
+		CreateTables: []interface{}{&HrRecruitmentInterview{}},
+		Group:        HrRecruitmentGroup,
+	},
+
+	OnInputFuzzyMap: map[string]runner.OnInputFuzzy{
+		"resume_id": func(ctx *runner.Context, req *usercall.OnInputFuzzyReq) (*usercall.OnInputFuzzyResp, error) {
+			// 【当前场景】resume_id是单选字段，只返回未约面的简历
+			// 【目标字段】为 HrRecruitmentInterviewScheduleReq.ResumeID 提供简历选择数据
+			var resumes []*HrRecruitment
+			db := ctx.MustGetOrInitDB()
+
+			if req.IsByFiledValues() {
+				// 多值查询：使用 IN 查询，这里必须用 db = db.Where
+				db = db.Where("id in ?", req.GetFiledValues())
+			} else if req.IsByFiledValue() {
+				// 单值查询：使用等值查询，性能最优
+				db = db.Where("id = ?", req.GetFiledValue()).Limit(1)
+			} else {
+				// 模糊查询：关键字搜索
+				// 【重要说明】只返回未约面的简历，兼容历史数据
+				// interview_status字段为后续新增字段，历史数据中此字段为NULL
+				// 使用 (interview_status IS NULL OR interview_status = '未约面') 来处理历史数据和新数据
+				db = db.Where("name LIKE ? OR position LIKE ? OR work_city LIKE ?", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%", "%"+req.Keyword()+"%").
+					Where("(interview_status IS NULL OR interview_status = '未约面')").
+					Limit(20)
+			}
+			db.Find(&resumes)
+
+			// 构建返回数据
+			fuzzyItems := make([]*usercall.InputFuzzyItem, 0)
+			for _, resume := range resumes {
+				fuzzyItems = append(fuzzyItems, &usercall.InputFuzzyItem{
+					Value: resume.ID,
+					Label: fmt.Sprintf("%s - %s (%s)", resume.Name, resume.Position, resume.WorkCity),
+					DisplayInfo: map[string]interface{}{
+						"求职者姓名": resume.Name,
+						"应聘职位":  resume.Position,
+						"期望工作地": resume.WorkCity,
+						"工作经验":  resume.Experience,
+						"期望薪资":  resume.Salary,
+						"投递时间":  time.UnixMilli(resume.CreatedAt).Format("2006-01-02 15:04"),
+					},
+				})
+			}
+
+			return &usercall.OnInputFuzzyResp{
+				Statistics: map[string]interface{}{
+					"选择说明": "选择需要安排约面的简历",
+					"注意事项": "只能选择未约面的简历",
+					"操作提示": "点击选择后即可安排约面",
+				},
+				Values: fuzzyItems,
+			}, nil
+		},
+	},
+}
+
+// HrRecruitmentInterviewListOption 约面记录列表配置
+var HrRecruitmentInterviewListOption = &runner.TableFunctionOptions{
+	BaseConfig: runner.BaseConfig{
+		ChineseName:  "约面记录管理",
+		ApiDesc:      "约面记录的增删改查管理，支持按简历、面试官、时间等条件筛选",
+		Tags:         []string{"招聘系统", "约面管理"},
+		Request:      &HrRecruitmentInterviewListReq{},
+		Response:     query.PaginatedTable[[]HrRecruitmentInterview]{},
+		CreateTables: []interface{}{&HrRecruitmentInterview{}},
+		Group:        HrRecruitmentGroup,
+	},
+	AutoCrudTable: &HrRecruitmentInterview{},
+
+	// 新增记录回调
+	OnTableAddRows: func(ctx *runner.Context, req *usercall.OnTableAddRowsReq) (*usercall.OnTableAddRowsResp, error) {
+		db := ctx.MustGetOrInitDB()
+		var addRows []*HrRecruitmentInterview
+		if err := req.DecodeBy(&addRows); err != nil {
+			return nil, err
+		}
+
+		// 验证简历是否存在且未约面
+		for _, row := range addRows {
+			var resume HrRecruitment
+			if err := db.Where("id = ?", row.ResumeID).First(&resume).Error; err != nil {
+				return nil, fmt.Errorf("简历不存在: %v", err)
+			}
+			// 【重要说明】检查约面状态，兼容历史数据
+			// interview_status字段为后续新增字段，历史数据中此字段为NULL
+			// 在Go中，数据库NULL值会被转换为空字符串""，允许安排约面
+			// 只有明确标记为"已约面"或"已取消"的简历才不允许重复安排约面
+			if resume.InterviewStatus == "已约面" || resume.InterviewStatus == "已取消" {
+				return nil, fmt.Errorf("简历 %s 已经安排约面", resume.Name)
+			}
+		}
+
+		err := db.Create(&addRows).Error
+		if err != nil {
+			return nil, err
+		}
+
+		// 更新简历约面状态
+		for _, row := range addRows {
+			db.Model(&HrRecruitment{}).Where("id = ?", row.ResumeID).Update("interview_status", "已约面")
+		}
+
+		return &usercall.OnTableAddRowsResp{}, nil
+	},
+
+	// 更新记录回调
+	OnTableUpdateRows: func(ctx *runner.Context, req *usercall.OnTableUpdateRowsReq) (*usercall.OnTableUpdateRowsResp, error) {
+		db := ctx.MustGetOrInitDB()
+		var updateRow HrRecruitmentInterview
+		if err := req.DecodeBy(&updateRow); err != nil {
+			return nil, err
+		}
+		err := db.Where("id in (?)", req.GetIds()).Updates(&updateRow).Error
+		if err != nil {
+			return nil, err
+		}
+		return &usercall.OnTableUpdateRowsResp{}, nil
+	},
+
+	// 删除记录回调
+	OnTableDeleteRows: func(ctx *runner.Context, req *usercall.OnTableDeleteRowsReq) (*usercall.OnTableDeleteRowsResp, error) {
+		db := ctx.MustGetOrInitDB()
+
+		// 获取要删除的约面记录对应的简历ID
+		var resumeIDs []int
+		db.Model(&HrRecruitmentInterview{}).Where("id IN ?", req.GetIds()).Pluck("resume_id", &resumeIDs)
+
+		// 删除约面记录
+		err := db.Delete(&HrRecruitmentInterview{}, req.GetIds()).Error
+		if err != nil {
+			return nil, err
+		}
+
+		// 更新简历约面状态为未约面
+		if len(resumeIDs) > 0 {
+			db.Model(&HrRecruitment{}).Where("id IN ?", resumeIDs).Update("interview_status", "未约面")
+		}
+
+		return &usercall.OnTableDeleteRowsResp{}, nil
+	},
+}
+
 // 路由注册
 func init() {
-	// 注册简历投递路由
-	runner.Post(RouterGroup+"/hr_recruitment_apply", HrRecruitmentApply, HrRecruitmentApplyOption)
 	// 注册简历管理路由
 	runner.Get(RouterGroup+"/hr_recruitment_list", HrRecruitmentList, HrRecruitmentListOption)
+	// 注册约面安排路由
+	runner.Post(RouterGroup+"/hr_recruitment_interview_schedule", HrRecruitmentInterviewSchedule, HrRecruitmentInterviewScheduleOption)
+	// 注册约面记录管理路由
+	runner.Get(RouterGroup+"/hr_recruitment_interview_list", HrRecruitmentInterviewList, HrRecruitmentInterviewListOption)
 }
 
 
+
 ```
+
+注意事项：
+
+
+ctx.GetUserInfo().UserID
+ctx.GetUserInfo().ID
+错误：不存在UserID和ID字段
+
+ctx.GetUserInfo().Username
+正确：Username是可读且永远不会变
